@@ -16,8 +16,6 @@ class CreateChannelDto {
     description;
     topic;
     type;
-    createdById;
-    workplaceId;
 }
 exports.CreateChannelDto = CreateChannelDto;
 __decorate([
@@ -40,14 +38,4 @@ __decorate([
     (0, class_validator_1.IsIn)(['public', 'private']),
     __metadata("design:type", String)
 ], CreateChannelDto.prototype, "type", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateChannelDto.prototype, "createdById", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateChannelDto.prototype, "workplaceId", void 0);
 //# sourceMappingURL=create-channel.dto.js.map

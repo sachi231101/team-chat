@@ -15,4 +15,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./channel-member.guard"), exports);
+__exportStar(require("./conversation-participant.guard"), exports);
+__exportStar(require("./message-access.guard"), exports);
 //# sourceMappingURL=index.js.map

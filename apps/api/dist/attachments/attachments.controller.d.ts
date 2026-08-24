@@ -1,10 +1,8 @@
-import { AttachmentsService } from './attachments.service';
 export declare class AttachmentsController {
-    private readonly attachmentsService;
-    constructor(attachmentsService: AttachmentsService);
-    getPresignedUrl(fileName: string, mimeType: string): Promise<{
-        uploadUrl: string;
-        fileUrl: string;
-        attachmentId: string;
-    }>;
+    upload(file: Express.Multer.File): {
+        name: string;
+        size: number;
+        type: string;
+        url: string;
+    };
 }

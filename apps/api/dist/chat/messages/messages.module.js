@@ -10,11 +10,14 @@ exports.MessagesModule = void 0;
 const common_1 = require("@nestjs/common");
 const messages_controller_1 = require("./messages.controller");
 const messages_service_1 = require("./messages.service");
+const mentions_module_1 = require("../mentions/mentions.module");
+const realtime_module_1 = require("../../realtime/realtime.module");
 let MessagesModule = class MessagesModule {
 };
 exports.MessagesModule = MessagesModule;
 exports.MessagesModule = MessagesModule = __decorate([
     (0, common_1.Module)({
+        imports: [mentions_module_1.MentionsModule, realtime_module_1.RealtimeModule],
         controllers: [messages_controller_1.MessagesController],
         providers: [messages_service_1.MessagesService],
         exports: [messages_service_1.MessagesService],

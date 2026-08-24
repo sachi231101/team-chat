@@ -9,4 +9,5 @@ export declare class ConversationsService {
         participants: string[];
         workplaceId?: string;
     }): Promise<Conversation>;
+    private findMatchingConversation;
 }

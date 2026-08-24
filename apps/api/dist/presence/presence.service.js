@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PresenceService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
+const prisma_errors_1 = require("../common/prisma-errors");
 let PresenceService = class PresenceService {
     prisma;
     constructor(prisma) {
@@ -56,7 +57,7 @@ let PresenceService = class PresenceService {
             };
         }
         catch (error) {
-            if (error.code === 'P2025') {
+            if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${userId} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to update presence for ${userId}: ${error.message}`);

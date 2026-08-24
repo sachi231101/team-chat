@@ -6,4 +6,5 @@ export declare class PrismaService extends PrismaClient implements OnModuleInit,
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     private seedInitialWorkspaceData;
+    private provisionMissingDefaultChannels;
 }

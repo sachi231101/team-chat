@@ -3,6 +3,4 @@ export declare class CreateChannelDto {
     description?: string;
     topic?: string;
     type: 'public' | 'private';
-    createdById?: string;
-    workplaceId?: string;
 }

@@ -2,7 +2,7 @@ import { PrismaService } from '../common/prisma.service';
 export declare class SearchService {
     private readonly prisma;
     constructor(prisma: PrismaService);
-    search(query: string, workplaceId?: string): Promise<{
+    search(query: string, userId: string, workplaceId?: string): Promise<{
         messages: {
             id: string;
             content: string;
@@ -12,6 +12,8 @@ export declare class SearchService {
             channelId: string | undefined;
             conversationId: string | undefined;
             createdAt: string;
+            reactions: never[];
+            updatedAt: string;
         }[];
         channels: {
             id: string;

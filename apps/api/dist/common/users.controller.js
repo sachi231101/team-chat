@@ -18,6 +18,8 @@ const prisma_service_1 = require("./prisma.service");
 const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_dto_1 = require("./dto/update-user.dto");
 const update_presence_dto_1 = require("../presence/dto/update-presence.dto");
+const prisma_errors_1 = require("./prisma-errors");
+const default_channels_1 = require("./default-channels");
 let UsersController = class UsersController {
     prisma;
     constructor(prisma) {
@@ -83,6 +85,7 @@ let UsersController = class UsersController {
                     workplaceId: body.workplaceId || 'wp-teamchat-main',
                 },
             });
+            await (0, default_channels_1.provisionUserPublicChannels)(this.prisma, u.id, u.workplaceId);
             return {
                 id: u.id,
                 name: u.name,
@@ -132,7 +135,7 @@ let UsersController = class UsersController {
             };
         }
         catch (error) {
-            if (error.code === 'P2025') {
+            if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to update user ${id}: ${error.message}`);
@@ -161,7 +164,7 @@ let UsersController = class UsersController {
             };
         }
         catch (error) {
-            if (error.code === 'P2025') {
+            if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to update status for user ${id}: ${error.message}`);
@@ -173,7 +176,7 @@ let UsersController = class UsersController {
             return { success: true };
         }
         catch (error) {
-            if (error.code === 'P2025') {
+            if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to delete user ${id}: ${error.message}`);

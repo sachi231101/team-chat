@@ -71,6 +71,9 @@ let ConversationsService = class ConversationsService {
         const wpId = data.workplaceId || 'wp-teamchat-main';
         const uniqueParticipants = Array.from(new Set(data.participants));
         try {
+            const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
+            if (existing)
+                return existing;
             const c = await this.prisma.$transaction(async (tx) => {
                 return tx.conversation.create({
                     data: {
@@ -94,6 +97,30 @@ let ConversationsService = class ConversationsService {
         catch (error) {
             throw new common_1.InternalServerErrorException(`Failed to create conversation: ${error.message}`);
         }
+    }
+    async findMatchingConversation(workplaceId, participantIds) {
+        const wanted = [...participantIds].sort();
+        const convos = await this.prisma.conversation.findMany({
+            where: {
+                workplaceId,
+                participants: { some: { userId: { in: wanted } } },
+            },
+            include: { participants: true },
+        });
+        const match = convos.find((c) => {
+            const ids = c.participants.map((p) => p.userId).sort();
+            return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
+        });
+        if (!match)
+            return null;
+        return {
+            id: match.id,
+            participants: match.participants.map((p) => p.userId),
+            workplaceId: match.workplaceId,
+            unreadCount: 0,
+            createdAt: match.createdAt.toISOString(),
+            updatedAt: match.updatedAt.toISOString(),
+        };
     }
 };
 exports.ConversationsService = ConversationsService;

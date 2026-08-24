@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ThreadsController = void 0;
 const common_1 = require("@nestjs/common");
 const threads_service_1 = require("./threads.service");
+const guards_1 = require("../../common/guards");
 let ThreadsController = class ThreadsController {
     threadsService;
     constructor(threadsService) {
@@ -27,6 +28,7 @@ let ThreadsController = class ThreadsController {
 exports.ThreadsController = ThreadsController;
 __decorate([
     (0, common_1.Get)(':parentMessageId/replies'),
+    (0, common_1.UseGuards)(guards_1.MessageAccessGuard),
     __param(0, (0, common_1.Param)('parentMessageId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

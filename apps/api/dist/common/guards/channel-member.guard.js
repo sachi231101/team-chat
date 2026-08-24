@@ -11,42 +11,38 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChannelMemberGuard = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma.service");
+const chat_access_service_1 = require("../chat-access.service");
+const request_user_1 = require("../request-user");
 let ChannelMemberGuard = class ChannelMemberGuard {
-    prisma;
-    constructor(prisma) {
-        this.prisma = prisma;
+    chatAccess;
+    constructor(chatAccess) {
+        this.chatAccess = chatAccess;
     }
     async canActivate(context) {
         const req = context.switchToHttp().getRequest();
-        const userId = req.headers['x-user-id'] || req.body?.senderId || 'usr-rahul';
-        const channelId = req.params?.id ||
-            req.params?.channelId ||
+        const { id: userId } = (0, request_user_1.readUserFromHeaders)(req.headers);
+        const channelId = req.params?.channelId ||
+            (req.route?.path?.includes('channels') ? req.params?.id : undefined) ||
             req.query?.channelId ||
             req.body?.channelId;
         if (!channelId) {
             return true;
         }
-        const channel = await this.prisma.channel.findUnique({
-            where: { id: channelId },
-            include: { members: true },
-        });
-        if (!channel) {
-            throw new common_1.NotFoundException(`Channel ${channelId} not found`);
-        }
-        if (channel.type === 'PUBLIC') {
+        try {
+            await this.chatAccess.assertChannelAccess(userId, channelId);
             return true;
         }
-        const isMember = channel.members.some((m) => m.userId === userId);
-        if (!isMember) {
-            throw new common_1.ForbiddenException('Access denied: You are not a member of this private channel');
+        catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException) {
+                throw error;
+            }
+            throw error;
         }
-        return true;
     }
 };
 exports.ChannelMemberGuard = ChannelMemberGuard;
 exports.ChannelMemberGuard = ChannelMemberGuard = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [chat_access_service_1.ChatAccessService])
 ], ChannelMemberGuard);
 //# sourceMappingURL=channel-member.guard.js.map

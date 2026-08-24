@@ -18,10 +18,15 @@ let ChannelsService = class ChannelsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll(workplaceId = 'wp-teamchat-main') {
+    async findAll(workplaceId = 'wp-teamchat-main', userId) {
         try {
             const channels = await this.prisma.channel.findMany({
-                where: { workplaceId },
+                where: {
+                    workplaceId,
+                    ...(userId
+                        ? { OR: [{ type: client_1.ChannelType.PUBLIC }, { members: { some: { userId } } }] }
+                        : {}),
+                },
                 include: { members: true },
                 orderBy: { createdAt: 'asc' },
             });
@@ -73,7 +78,10 @@ let ChannelsService = class ChannelsService {
         }
     }
     async create(data) {
-        const creatorId = data.createdById || 'usr-rahul';
+        const creatorId = data.createdById;
+        if (!creatorId) {
+            throw new common_1.InternalServerErrorException('createdById is required');
+        }
         const wpId = data.workplaceId || 'wp-teamchat-main';
         const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
         try {
@@ -89,7 +97,7 @@ let ChannelsService = class ChannelsService {
                         members: {
                             create: {
                                 userId: creatorId,
-                                role: 'admin',
+                                role: client_1.ChannelMemberRole.ADMIN,
                             },
                         },
                     },
@@ -112,6 +120,10 @@ let ChannelsService = class ChannelsService {
             };
         }
         catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002') {
+                throw new common_1.ConflictException(`Channel #${normalizedName} already exists`);
+            }
             throw new common_1.InternalServerErrorException(`Failed to create channel: ${error.message}`);
         }
     }
@@ -144,7 +156,7 @@ let ChannelsService = class ChannelsService {
                 where: {
                     channelId_userId: { channelId, userId },
                 },
-                create: { channelId, userId, role: 'member' },
+                create: { channelId, userId, role: client_1.ChannelMemberRole.MEMBER },
                 update: {},
             })));
             return this.getMembers(channelId);

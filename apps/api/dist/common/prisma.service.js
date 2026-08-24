@@ -10,6 +10,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const default_channels_1 = require("./default-channels");
 let PrismaService = PrismaService_1 = class PrismaService extends client_1.PrismaClient {
     logger = new common_1.Logger(PrismaService_1.name);
     isConnected = false;
@@ -19,6 +20,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
             this.isConnected = true;
             this.logger.log('✅ PostgreSQL database connected successfully via Prisma');
             await this.seedInitialWorkspaceData();
+            await this.provisionMissingDefaultChannels();
         }
         catch (error) {
             this.isConnected = false;
@@ -145,6 +147,15 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     createdById: 'usr-rahul',
                 },
                 {
+                    id: 'chn-random',
+                    name: 'random',
+                    description: 'Watercooler chat, intros, and off-topic conversation',
+                    topic: 'Say hello',
+                    type: client_1.ChannelType.PUBLIC,
+                    workplaceId: 'wp-teamchat-main',
+                    createdById: 'usr-rahul',
+                },
+                {
                     id: 'chn-engineering',
                     name: 'engineering',
                     description: 'Technical architecture, code reviews, PRs, and system design discussions',
@@ -180,7 +191,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                         create: {
                             channelId: c.id,
                             userId: u.id,
-                            role: u.id === c.createdById ? 'admin' : 'member',
+                            role: u.id === c.createdById ? client_1.ChannelMemberRole.ADMIN : client_1.ChannelMemberRole.MEMBER,
                         },
                         update: {},
                     });
@@ -252,6 +263,30 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
         }
         catch (err) {
             this.logger.warn(`Seed notice: ${err.message}`);
+        }
+    }
+    async provisionMissingDefaultChannels() {
+        try {
+            const workplaceId = 'wp-teamchat-main';
+            const users = await this.user.findMany({ where: { workplaceId }, orderBy: { createdAt: 'asc' } });
+            if (users.length === 0)
+                return;
+            const missing = [];
+            for (const def of default_channels_1.DEFAULT_PUBLIC_CHANNELS) {
+                const exists = await this.channel.findFirst({ where: { workplaceId, name: def.name } });
+                if (!exists)
+                    missing.push(def.name);
+            }
+            if (missing.length === 0)
+                return;
+            this.logger.log(`🌱 Creating default channels (${missing.join(', ')}) for existing workspace users`);
+            for (const user of users) {
+                await (0, default_channels_1.provisionUserPublicChannels)(this, user.id, workplaceId);
+            }
+        }
+        catch (err) {
+            fetch('http://127.0.0.1:7478/ingest/00f10b65-0a04-4e60-b5e9-07d47622c725', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'd06bbf' }, body: JSON.stringify({ sessionId: 'd06bbf', runId: 'post-fix', hypothesisId: 'A', location: 'prisma.service.ts:provisionMissingDefaultChannels', message: 'default channel provision failed', data: { error: err.message }, timestamp: Date.now() }) }).catch(() => { });
+            this.logger.warn(`Default channel provision notice: ${err.message}`);
         }
     }
 };

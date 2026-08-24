@@ -9,16 +9,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RealtimeModule = void 0;
 const common_1 = require("@nestjs/common");
 const chat_gateway_1 = require("./gateways/chat.gateway");
-const messages_module_1 = require("../chat/messages/messages.module");
+const realtime_service_1 = require("./realtime.service");
 const presence_module_1 = require("../presence/presence.module");
 let RealtimeModule = class RealtimeModule {
 };
 exports.RealtimeModule = RealtimeModule;
 exports.RealtimeModule = RealtimeModule = __decorate([
+    (0, common_1.Global)(),
     (0, common_1.Module)({
-        imports: [messages_module_1.MessagesModule, presence_module_1.PresenceModule],
-        providers: [chat_gateway_1.ChatGateway],
-        exports: [chat_gateway_1.ChatGateway],
+        imports: [presence_module_1.PresenceModule],
+        providers: [chat_gateway_1.ChatGateway, realtime_service_1.RealtimeService],
+        exports: [chat_gateway_1.ChatGateway, realtime_service_1.RealtimeService],
     })
 ], RealtimeModule);
 //# sourceMappingURL=realtime.module.js.map

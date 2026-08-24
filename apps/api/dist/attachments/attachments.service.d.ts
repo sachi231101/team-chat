@@ -1,7 +1,6 @@
+export declare const UPLOAD_DIR: string;
 export declare class AttachmentsService {
-    getUploadUrl(fileName: string, mimeType: string): Promise<{
-        uploadUrl: string;
-        fileUrl: string;
-        attachmentId: string;
-    }>;
+    readonly uploadDir: string;
+    constructor();
+    uniqueName(originalName: string): string;
 }

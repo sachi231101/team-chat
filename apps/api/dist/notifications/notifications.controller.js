@@ -15,39 +15,43 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsController = void 0;
 const common_1 = require("@nestjs/common");
 const notifications_service_1 = require("./notifications.service");
+const decorators_1 = require("../common/decorators");
 let NotificationsController = class NotificationsController {
     notificationsService;
     constructor(notificationsService) {
         this.notificationsService = notificationsService;
     }
-    async findAll() {
-        return this.notificationsService.findAll();
+    async findAll(user) {
+        return this.notificationsService.findAll(user.id);
     }
-    async markAsRead(id) {
-        return this.notificationsService.markAsRead(id);
+    async markAsRead(user, id) {
+        return this.notificationsService.markAsRead(id, user.id);
     }
-    async markAllAsRead() {
-        return this.notificationsService.markAllAsRead();
+    async markAllAsRead(user) {
+        return this.notificationsService.markAllAsRead(user.id);
     }
 };
 exports.NotificationsController = NotificationsController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], NotificationsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Patch)(':id/read'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], NotificationsController.prototype, "markAsRead", null);
 __decorate([
     (0, common_1.Post)('read-all'),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], NotificationsController.prototype, "markAllAsRead", null);
 exports.NotificationsController = NotificationsController = __decorate([

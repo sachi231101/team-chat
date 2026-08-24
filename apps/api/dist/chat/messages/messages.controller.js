@@ -19,54 +19,67 @@ const create_message_dto_1 = require("./dto/create-message.dto");
 const edit_message_dto_1 = require("./dto/edit-message.dto");
 const toggle_reaction_dto_1 = require("../reactions/dto/toggle-reaction.dto");
 const guards_1 = require("../../common/guards");
+const decorators_1 = require("../../common/decorators");
 let MessagesController = class MessagesController {
     messagesService;
     constructor(messagesService) {
         this.messagesService = messagesService;
     }
-    findAll(channelId, conversationId, limit, cursor) {
-        return this.messagesService.findAll(channelId, conversationId, limit, cursor);
+    findAll(user, channelId, conversationId, limit, cursor) {
+        return this.messagesService.findAll(user.id, channelId, conversationId, limit, cursor);
+    }
+    findPinned(user, channelId, conversationId) {
+        if (!channelId && !conversationId) {
+            return this.messagesService.findPinnedForUser(user.id);
+        }
+        return this.messagesService.findPinned(channelId, conversationId);
     }
     findOne(id) {
         return this.messagesService.findOne(id);
     }
-    create(body) {
-        return this.messagesService.create(body);
+    create(user, body) {
+        return this.messagesService.create(user.id, body);
     }
-    update(id, body) {
-        return this.messagesService.update(id, body.content);
+    update(user, id, body) {
+        return this.messagesService.update(id, body.content, user.id);
     }
-    delete(id) {
-        return this.messagesService.delete(id);
+    delete(user, id) {
+        return this.messagesService.delete(id, user.id);
     }
     togglePin(id) {
         return this.messagesService.togglePin(id);
     }
-    toggleReaction(id, body) {
-        return this.messagesService.toggleReaction(id, body.emoji, body.userId, body.userName);
+    toggleReaction(user, id, body) {
+        return this.messagesService.toggleReaction(id, body.emoji, user.id);
     }
     getReplies(id) {
         return this.messagesService.getReplies(id);
     }
-    markAsRead(id) {
-        return this.messagesService.markAsRead(id);
-    }
-    summarizeThread(id) {
-        return this.messagesService.summarizeThread(id);
+    markAsRead(user, id) {
+        return this.messagesService.markAsRead(id, user.id);
     }
 };
 exports.MessagesController = MessagesController;
 __decorate([
     (0, common_1.Get)(),
-    (0, common_1.UseGuards)(guards_1.ChannelMemberGuard),
-    __param(0, (0, common_1.Query)('channelId')),
-    __param(1, (0, common_1.Query)('conversationId')),
-    __param(2, (0, common_1.Query)('limit')),
-    __param(3, (0, common_1.Query)('cursor')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('channelId')),
+    __param(2, (0, common_1.Query)('conversationId')),
+    __param(3, (0, common_1.Query)('limit')),
+    __param(4, (0, common_1.Query)('cursor')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Number, String]),
+    __metadata("design:paramtypes", [Object, String, String, Number, String]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('pinned'),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('channelId')),
+    __param(2, (0, common_1.Query)('conversationId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], MessagesController.prototype, "findPinned", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -76,25 +89,27 @@ __decorate([
 ], MessagesController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, common_1.UseGuards)(guards_1.ChannelMemberGuard),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_message_dto_1.CreateMessageDto]),
+    __metadata("design:paramtypes", [Object, create_message_dto_1.CreateMessageDto]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, edit_message_dto_1.EditMessageDto]),
+    __metadata("design:paramtypes", [Object, String, edit_message_dto_1.EditMessageDto]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "delete", null);
 __decorate([
@@ -106,10 +121,11 @@ __decorate([
 ], MessagesController.prototype, "togglePin", null);
 __decorate([
     (0, common_1.Post)(':id/reactions'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, toggle_reaction_dto_1.ToggleReactionDto]),
+    __metadata("design:paramtypes", [Object, String, toggle_reaction_dto_1.ToggleReactionDto]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "toggleReaction", null);
 __decorate([
@@ -121,20 +137,15 @@ __decorate([
 ], MessagesController.prototype, "getReplies", null);
 __decorate([
     (0, common_1.Post)(':id/read'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "markAsRead", null);
-__decorate([
-    (0, common_1.Post)(':id/summarize'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], MessagesController.prototype, "summarizeThread", null);
 exports.MessagesController = MessagesController = __decorate([
     (0, common_1.Controller)('messages'),
+    (0, common_1.UseGuards)(guards_1.MessageAccessGuard),
     __metadata("design:paramtypes", [messages_service_1.MessagesService])
 ], MessagesController);
 //# sourceMappingURL=messages.controller.js.map

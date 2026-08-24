@@ -5,18 +5,94 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MentionsService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
+const prisma_service_1 = require("../../common/prisma.service");
 let MentionsService = class MentionsService {
+    prisma;
+    constructor(prisma) {
+        this.prisma = prisma;
+    }
     extractMentions(content) {
-        const mentionRegex = /@(\w+)/g;
-        const matches = content.match(mentionRegex) || [];
-        return matches.map((m) => m.slice(1));
+        const mentionRegex = /@([\w.\- ]+?)(?=\s|$|[.,!?;:])/g;
+        const names = [];
+        let match;
+        while ((match = mentionRegex.exec(content)) !== null) {
+            names.push(match[1].trim());
+        }
+        return names;
+    }
+    async notifyFromMessage(message) {
+        const names = this.extractMentions(message.content);
+        const users = await this.prisma.user.findMany();
+        const byName = new Map(users.map((u) => [u.name.toLowerCase(), u]));
+        const mentioned = new Set();
+        for (const name of names) {
+            const user = byName.get(name.toLowerCase());
+            if (user && user.id !== message.senderId) {
+                mentioned.add(user.id);
+            }
+        }
+        for (const userId of mentioned) {
+            await this.prisma.notification.create({
+                data: {
+                    userId,
+                    title: `${message.senderName} mentioned you`,
+                    body: message.content.slice(0, 180),
+                    type: client_1.NotificationType.MENTION,
+                    channelId: message.channelId,
+                    conversationId: message.conversationId,
+                    messageId: message.id,
+                },
+            });
+        }
+        if (message.parentMessageId) {
+            const parent = await this.prisma.message.findUnique({
+                where: { id: message.parentMessageId },
+            });
+            if (parent && parent.senderId !== message.senderId && !mentioned.has(parent.senderId)) {
+                await this.prisma.notification.create({
+                    data: {
+                        userId: parent.senderId,
+                        title: `${message.senderName} replied to your message`,
+                        body: message.content.slice(0, 180),
+                        type: client_1.NotificationType.REPLY,
+                        channelId: message.channelId,
+                        conversationId: message.conversationId,
+                        messageId: message.id,
+                    },
+                });
+            }
+        }
+        if (message.conversationId && !message.parentMessageId) {
+            const participants = await this.prisma.conversationParticipant.findMany({
+                where: { conversationId: message.conversationId },
+            });
+            for (const p of participants) {
+                if (p.userId === message.senderId || mentioned.has(p.userId))
+                    continue;
+                await this.prisma.notification.create({
+                    data: {
+                        userId: p.userId,
+                        title: `New message from ${message.senderName}`,
+                        body: message.content.slice(0, 180),
+                        type: client_1.NotificationType.DIRECT_MESSAGE,
+                        conversationId: message.conversationId,
+                        messageId: message.id,
+                    },
+                });
+            }
+        }
     }
 };
 exports.MentionsService = MentionsService;
 exports.MentionsService = MentionsService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], MentionsService);
 //# sourceMappingURL=mentions.service.js.map

@@ -1,8 +1,9 @@
 import { SearchService } from './search.service';
+import type { RequestUser } from '../common/request-user';
 export declare class SearchController {
     private readonly searchService;
     constructor(searchService: SearchService);
-    search(q: string): Promise<{
+    search(user: RequestUser, q: string): Promise<{
         messages: {
             id: string;
             content: string;
@@ -12,6 +13,8 @@ export declare class SearchController {
             channelId: string | undefined;
             conversationId: string | undefined;
             createdAt: string;
+            reactions: never[];
+            updatedAt: string;
         }[];
         channels: {
             id: string;

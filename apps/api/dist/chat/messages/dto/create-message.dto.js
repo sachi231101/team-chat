@@ -11,11 +11,27 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateMessageDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+class AttachmentInputDto {
+    name;
+    size;
+    type;
+    url;
+}
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], AttachmentInputDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], AttachmentInputDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], AttachmentInputDto.prototype, "url", void 0);
 class CreateMessageDto {
     content;
-    senderId;
-    senderName;
-    senderAvatar;
     channelId;
     conversationId;
     parentMessageId;
@@ -27,21 +43,6 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateMessageDto.prototype, "content", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateMessageDto.prototype, "senderId", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateMessageDto.prototype, "senderName", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateMessageDto.prototype, "senderAvatar", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
@@ -60,6 +61,8 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => AttachmentInputDto),
     __metadata("design:type", Array)
 ], CreateMessageDto.prototype, "attachments", void 0);
 //# sourceMappingURL=create-message.dto.js.map

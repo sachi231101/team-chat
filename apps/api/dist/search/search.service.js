@@ -17,17 +17,38 @@ let SearchService = class SearchService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async search(query, workplaceId = 'wp-teamchat-main') {
+    async search(query, userId, workplaceId = 'wp-teamchat-main') {
         if (!query || !query.trim()) {
             return { messages: [], channels: [], users: [] };
         }
         const q = query.trim();
         try {
+            const memberships = await this.prisma.channelMember.findMany({
+                where: { userId },
+                select: { channelId: true },
+            });
+            const memberChannelIds = memberships.map((m) => m.channelId);
+            const participantConvos = await this.prisma.conversationParticipant.findMany({
+                where: { userId },
+                select: { conversationId: true },
+            });
+            const conversationIds = participantConvos.map((p) => p.conversationId);
             const [messages, channels, users] = await Promise.all([
                 this.prisma.message.findMany({
                     where: {
                         content: { contains: q, mode: 'insensitive' },
                         deletedAt: null,
+                        OR: [
+                            {
+                                channel: {
+                                    workplaceId,
+                                    OR: [{ type: 'PUBLIC' }, { id: { in: memberChannelIds } }],
+                                },
+                            },
+                            {
+                                conversationId: { in: conversationIds },
+                            },
+                        ],
                     },
                     include: { sender: true },
                     take: 20,
@@ -39,6 +60,11 @@ let SearchService = class SearchService {
                         OR: [
                             { name: { contains: q, mode: 'insensitive' } },
                             { description: { contains: q, mode: 'insensitive' } },
+                        ],
+                        AND: [
+                            {
+                                OR: [{ type: 'PUBLIC' }, { id: { in: memberChannelIds } }],
+                            },
                         ],
                     },
                     take: 20,
@@ -64,6 +90,8 @@ let SearchService = class SearchService {
                     channelId: m.channelId ?? undefined,
                     conversationId: m.conversationId ?? undefined,
                     createdAt: m.createdAt.toISOString(),
+                    reactions: [],
+                    updatedAt: m.updatedAt.toISOString(),
                 })),
                 channels: channels.map((c) => ({
                     id: c.id,

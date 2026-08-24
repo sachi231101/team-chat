@@ -14,27 +14,42 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AttachmentsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const crypto_1 = require("crypto");
 const attachments_service_1 = require("./attachments.service");
 let AttachmentsController = class AttachmentsController {
-    attachmentsService;
-    constructor(attachmentsService) {
-        this.attachmentsService = attachmentsService;
-    }
-    async getPresignedUrl(fileName, mimeType) {
-        return this.attachmentsService.getUploadUrl(fileName, mimeType);
+    upload(file) {
+        if (!file) {
+            throw new common_1.BadRequestException('file is required');
+        }
+        return {
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+            url: `/uploads/${file.filename}`,
+        };
     }
 };
 exports.AttachmentsController = AttachmentsController;
 __decorate([
-    (0, common_1.Post)('presigned-url'),
-    __param(0, (0, common_1.Body)('fileName')),
-    __param(1, (0, common_1.Body)('mimeType')),
+    (0, common_1.Post)('upload'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.diskStorage)({
+            destination: attachments_service_1.UPLOAD_DIR,
+            filename: (_req, file, cb) => {
+                const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+                cb(null, `${(0, crypto_1.randomUUID)()}-${safeName}`);
+            },
+        }),
+        limits: { fileSize: 15 * 1024 * 1024 },
+    })),
+    __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", Promise)
-], AttachmentsController.prototype, "getPresignedUrl", null);
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AttachmentsController.prototype, "upload", null);
 exports.AttachmentsController = AttachmentsController = __decorate([
-    (0, common_1.Controller)('attachments'),
-    __metadata("design:paramtypes", [attachments_service_1.AttachmentsService])
+    (0, common_1.Controller)('attachments')
 ], AttachmentsController);
 //# sourceMappingURL=attachments.controller.js.map

@@ -17,84 +17,92 @@ exports.ChatGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const common_1 = require("@nestjs/common");
-const messages_service_1 = require("../../chat/messages/messages.service");
 const presence_service_1 = require("../../presence/presence.service");
+const realtime_service_1 = require("../realtime.service");
+const chat_access_service_1 = require("../../common/chat-access.service");
+const request_user_1 = require("../../common/request-user");
+function allowedOrigins() {
+    const raw = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || '';
+    const fromEnv = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (fromEnv.length)
+        return fromEnv;
+    return ['http://localhost:5173', 'http://localhost:3001'];
+}
 let ChatGateway = ChatGateway_1 = class ChatGateway {
-    messagesService;
     presenceService;
+    realtime;
+    chatAccess;
     server;
     logger = new common_1.Logger(ChatGateway_1.name);
-    constructor(messagesService, presenceService) {
-        this.messagesService = messagesService;
+    constructor(presenceService, realtime, chatAccess) {
         this.presenceService = presenceService;
+        this.realtime = realtime;
+        this.chatAccess = chatAccess;
+    }
+    afterInit(server) {
+        this.realtime.setServer(server);
     }
     handleConnection(client) {
-        this.logger.log(`Client connected: ${client.id}`);
+        const userId = client.handshake.auth?.userId ||
+            client.handshake.headers['x-user-id'] ||
+            request_user_1.DEFAULT_MOCK_USER_ID;
+        const workplaceId = client.handshake.auth?.workplaceId ||
+            client.handshake.headers['x-workplace-id'] ||
+            request_user_1.DEFAULT_WORKPLACE_ID;
+        client.data.userId = userId;
+        client.data.workplaceId = workplaceId;
+        this.logger.log(`Client connected: ${client.id} as ${userId}`);
     }
     handleDisconnect(client) {
         this.logger.log(`Client disconnected: ${client.id}`);
     }
-    handleJoinChannel(client, data) {
+    async handleJoinChannel(client, data) {
+        const userId = client.data.userId;
+        const allowed = await this.chatAccess.canJoinChannel(userId, data.channelId);
+        if (!allowed) {
+            return { event: 'error', message: 'Not allowed to join this channel' };
+        }
         const room = `channel:${data.channelId}`;
         client.join(room);
         return { event: 'joined', channelId: data.channelId };
     }
     handleLeaveChannel(client, data) {
-        const room = `channel:${data.channelId}`;
-        client.leave(room);
+        client.leave(`channel:${data.channelId}`);
         return { event: 'left', channelId: data.channelId };
     }
-    handleJoinConversation(client, data) {
-        const room = `conversation:${data.conversationId}`;
-        client.join(room);
+    async handleJoinConversation(client, data) {
+        const userId = client.data.userId;
+        const allowed = await this.chatAccess.canJoinConversation(userId, data.conversationId);
+        if (!allowed) {
+            return { event: 'error', message: 'Not allowed to join this conversation' };
+        }
+        client.join(`conversation:${data.conversationId}`);
         return { event: 'joined', conversationId: data.conversationId };
     }
-    handleSendMessage(client, data) {
-        if (data.channelId) {
-            client.to(`channel:${data.channelId}`).emit('message:created', data);
-        }
-        else if (data.conversationId) {
-            client.to(`conversation:${data.conversationId}`).emit('message:created', data);
-        }
-        return { received: true };
-    }
-    handleEditMessage(client, data) {
-        client.broadcast.emit('message:updated', { id: data.id, content: data.content, editedAt: new Date().toISOString() });
-        return { received: true };
-    }
-    handleDeleteMessage(client, data) {
-        client.broadcast.emit('message:deleted', { id: data.id });
-        return { received: true };
-    }
-    handleToggleReaction(client, data) {
-        client.broadcast.emit('reaction:toggled', {
-            messageId: data.messageId,
-            message: data,
-        });
-        return { received: true };
-    }
-    handleTogglePin(client, data) {
-        client.broadcast.emit('pin:toggled', {
-            messageId: data.messageId,
-        });
-        return { received: true };
-    }
-    async handlePresenceUpdate(_client, data) {
+    async handlePresenceUpdate(client, data) {
+        const userId = client.data.userId;
         try {
-            const user = await this.presenceService.setPresence(data.userId, data.status, data.statusMessage);
-            this.server.emit('presence:updated', user);
+            const user = await this.presenceService.setPresence(userId, data.status, data.statusMessage);
+            this.realtime.emitGlobal('presence:updated', user);
             return user;
         }
         catch (error) {
-            this.logger.error(`Failed to update presence for ${data.userId}: ${error.message}`);
+            this.logger.error(`Failed to update presence for ${userId}: ${error.message}`);
             return { error: 'Failed to update presence' };
         }
     }
     handleTypingStart(client, data) {
-        client.broadcast.emit('typing:started', data);
+        const userId = client.data.userId;
+        const payload = { userId, userName: data.userName, channelId: data.channelId, conversationId: data.conversationId };
+        this.realtime.emitToChat(data, 'typing:started', payload);
     }
     handleTypingStop(client, data) {
-        client.broadcast.emit('typing:stopped', data);
+        const userId = client.data.userId;
+        this.realtime.emitToChat(data, 'typing:stopped', {
+            userId,
+            channelId: data.channelId,
+            conversationId: data.conversationId,
+        });
     }
 };
 exports.ChatGateway = ChatGateway;
@@ -108,7 +116,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], ChatGateway.prototype, "handleJoinChannel", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('channel:leave'),
@@ -124,48 +132,8 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], ChatGateway.prototype, "handleJoinConversation", null);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('message:send'),
-    __param(0, (0, websockets_1.ConnectedSocket)()),
-    __param(1, (0, websockets_1.MessageBody)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], ChatGateway.prototype, "handleSendMessage", null);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('message:edit'),
-    __param(0, (0, websockets_1.ConnectedSocket)()),
-    __param(1, (0, websockets_1.MessageBody)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], ChatGateway.prototype, "handleEditMessage", null);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('message:delete'),
-    __param(0, (0, websockets_1.ConnectedSocket)()),
-    __param(1, (0, websockets_1.MessageBody)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], ChatGateway.prototype, "handleDeleteMessage", null);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('reaction:toggle'),
-    __param(0, (0, websockets_1.ConnectedSocket)()),
-    __param(1, (0, websockets_1.MessageBody)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], ChatGateway.prototype, "handleToggleReaction", null);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('pin:toggle'),
-    __param(0, (0, websockets_1.ConnectedSocket)()),
-    __param(1, (0, websockets_1.MessageBody)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], ChatGateway.prototype, "handleTogglePin", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('presence:update'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
@@ -193,14 +161,12 @@ __decorate([
 exports.ChatGateway = ChatGateway = ChatGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         cors: {
-            origin: process.env.CORS_ORIGIN?.split(',') ?? [
-                'http://localhost:5173',
-                'http://localhost:3001',
-            ],
+            origin: allowedOrigins(),
             credentials: true,
         },
     }),
-    __metadata("design:paramtypes", [messages_service_1.MessagesService,
-        presence_service_1.PresenceService])
+    __metadata("design:paramtypes", [presence_service_1.PresenceService,
+        realtime_service_1.RealtimeService,
+        chat_access_service_1.ChatAccessService])
 ], ChatGateway);
 //# sourceMappingURL=chat.gateway.js.map

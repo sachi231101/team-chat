@@ -1,22 +1,30 @@
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { MessagesService } from '../../chat/messages/messages.service';
 import { PresenceService } from '../../presence/presence.service';
-import { Message, UserStatus } from '@team-chat/shared';
-export declare class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-    private readonly messagesService;
+import { RealtimeService } from '../realtime.service';
+import { ChatAccessService } from '../../common/chat-access.service';
+import { UserStatus } from '@team-chat/shared';
+export declare class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     private readonly presenceService;
+    private readonly realtime;
+    private readonly chatAccess;
     server: Server;
     private readonly logger;
-    constructor(messagesService: MessagesService, presenceService: PresenceService);
+    constructor(presenceService: PresenceService, realtime: RealtimeService, chatAccess: ChatAccessService);
+    afterInit(server: Server): void;
     handleConnection(client: Socket): void;
     handleDisconnect(client: Socket): void;
     handleJoinChannel(client: Socket, data: {
         channelId: string;
-    }): {
+    }): Promise<{
+        event: string;
+        message: string;
+        channelId?: undefined;
+    } | {
         event: string;
         channelId: string;
-    };
+        message?: undefined;
+    }>;
     handleLeaveChannel(client: Socket, data: {
         channelId: string;
     }): {
@@ -25,59 +33,27 @@ export declare class ChatGateway implements OnGatewayConnection, OnGatewayDiscon
     };
     handleJoinConversation(client: Socket, data: {
         conversationId: string;
-    }): {
+    }): Promise<{
+        event: string;
+        message: string;
+        conversationId?: undefined;
+    } | {
         event: string;
         conversationId: string;
-    };
-    handleSendMessage(client: Socket, data: Partial<Message> & {
-        content: string;
-        senderId?: string;
-        senderName?: string;
-        channelId?: string;
-        conversationId?: string;
-        parentMessageId?: string;
-    }): {
-        received: boolean;
-    };
-    handleEditMessage(client: Socket, data: {
-        id: string;
-        content: string;
-    }): {
-        received: boolean;
-    };
-    handleDeleteMessage(client: Socket, data: {
-        id: string;
-    }): {
-        received: boolean;
-    };
-    handleToggleReaction(client: Socket, data: {
-        messageId: string;
-        emoji: string;
-        userId: string;
-        userName?: string;
-    }): {
-        received: boolean;
-    };
-    handleTogglePin(client: Socket, data: {
-        messageId: string;
-    }): {
-        received: boolean;
-    };
-    handlePresenceUpdate(_client: Socket, data: {
-        userId: string;
+        message?: undefined;
+    }>;
+    handlePresenceUpdate(client: Socket, data: {
         status: UserStatus;
         statusMessage?: string;
     }): Promise<import("@team-chat/shared").User | {
         error: string;
     }>;
     handleTypingStart(client: Socket, data: {
-        userId: string;
         userName: string;
         channelId?: string;
         conversationId?: string;
     }): void;
     handleTypingStop(client: Socket, data: {
-        userId: string;
         channelId?: string;
         conversationId?: string;
     }): void;

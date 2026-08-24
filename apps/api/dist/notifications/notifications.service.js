@@ -12,12 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
+const prisma_errors_1 = require("../common/prisma-errors");
 let NotificationsService = class NotificationsService {
     prisma;
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll(userId = 'usr-rahul') {
+    async findAll(userId) {
         try {
             const notifications = await this.prisma.notification.findMany({
                 where: { userId },
@@ -28,8 +29,12 @@ let NotificationsService = class NotificationsService {
                 title: n.title,
                 body: n.body,
                 time: this.formatTimeAgo(n.createdAt),
-                type: n.type === 'DIRECT_MESSAGE' ? 'dm' : n.type.toLowerCase(),
+                type: n.type === 'DIRECT_MESSAGE'
+                    ? 'dm'
+                    : n.type.toLowerCase(),
                 channelId: n.channelId ?? undefined,
+                conversationId: n.conversationId ?? undefined,
+                messageId: n.messageId ?? undefined,
                 unread: n.unread,
                 createdAt: n.createdAt.toISOString(),
             }));
@@ -38,8 +43,14 @@ let NotificationsService = class NotificationsService {
             throw new common_1.InternalServerErrorException(`Failed to fetch notifications: ${error.message}`);
         }
     }
-    async markAsRead(id) {
+    async markAsRead(id, userId) {
         try {
+            const existing = await this.prisma.notification.findFirst({
+                where: { id, userId },
+            });
+            if (!existing) {
+                throw new common_1.NotFoundException(`Notification ${id} not found`);
+            }
             await this.prisma.notification.update({
                 where: { id },
                 data: { unread: false },
@@ -47,10 +58,15 @@ let NotificationsService = class NotificationsService {
             return { success: true };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException)
+                throw error;
+            if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
+                throw new common_1.NotFoundException(`Notification ${id} not found`);
+            }
             throw new common_1.InternalServerErrorException(`Failed to mark notification ${id} as read: ${error.message}`);
         }
     }
-    async markAllAsRead(userId = 'usr-rahul') {
+    async markAllAsRead(userId) {
         try {
             await this.prisma.notification.updateMany({
                 where: { userId },

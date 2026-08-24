@@ -3,7 +3,7 @@ import { Channel, User } from '@team-chat/shared';
 export declare class ChannelsService {
     private readonly prisma;
     constructor(prisma: PrismaService);
-    findAll(workplaceId?: string): Promise<Channel[]>;
+    findAll(workplaceId?: string, userId?: string): Promise<Channel[]>;
     findOne(id: string, workplaceId?: string): Promise<Channel>;
     create(data: {
         name: string;

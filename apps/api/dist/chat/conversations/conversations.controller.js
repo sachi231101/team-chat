@@ -16,40 +16,50 @@ exports.ConversationsController = void 0;
 const common_1 = require("@nestjs/common");
 const conversations_service_1 = require("./conversations.service");
 const create_conversation_dto_1 = require("./dto/create-conversation.dto");
+const guards_1 = require("../../common/guards");
+const decorators_1 = require("../../common/decorators");
 let ConversationsController = class ConversationsController {
     conversationsService;
     constructor(conversationsService) {
         this.conversationsService = conversationsService;
     }
-    findAll() {
-        return this.conversationsService.findAll();
+    findAll(user) {
+        return this.conversationsService.findAll(user.workplaceId, user.id);
     }
-    findOne(id) {
-        return this.conversationsService.findOne(id);
+    findOne(id, user) {
+        return this.conversationsService.findOne(id, user.workplaceId);
     }
-    create(body) {
-        return this.conversationsService.create(body);
+    create(user, body) {
+        const participants = Array.from(new Set([user.id, ...(body.participants || [])]));
+        return this.conversationsService.create({
+            participants,
+            workplaceId: user.workplaceId,
+        });
     }
 };
 exports.ConversationsController = ConversationsController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], ConversationsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),
+    (0, common_1.UseGuards)(guards_1.ConversationParticipantGuard),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], ConversationsController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_conversation_dto_1.CreateConversationDto]),
+    __metadata("design:paramtypes", [Object, create_conversation_dto_1.CreateConversationDto]),
     __metadata("design:returntype", void 0)
 ], ConversationsController.prototype, "create", null);
 exports.ConversationsController = ConversationsController = __decorate([

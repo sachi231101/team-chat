@@ -2,30 +2,22 @@ import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { ToggleReactionDto } from '../reactions/dto/toggle-reaction.dto';
+import type { RequestUser } from '../../common/request-user';
 export declare class MessagesController {
     private readonly messagesService;
     constructor(messagesService: MessagesService);
-    findAll(channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<import("@team-chat/shared").Message[]>;
+    findAll(user: RequestUser, channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<import("./messages.service").MessageListResult>;
+    findPinned(user: RequestUser, channelId?: string, conversationId?: string): Promise<import("@team-chat/shared").Message[]>;
     findOne(id: string): Promise<import("@team-chat/shared").Message>;
-    create(body: CreateMessageDto): Promise<import("@team-chat/shared").Message>;
-    update(id: string, body: EditMessageDto): Promise<import("@team-chat/shared").Message>;
-    delete(id: string): Promise<{
+    create(user: RequestUser, body: CreateMessageDto): Promise<import("@team-chat/shared").Message>;
+    update(user: RequestUser, id: string, body: EditMessageDto): Promise<import("@team-chat/shared").Message>;
+    delete(user: RequestUser, id: string): Promise<{
         success: boolean;
     }>;
     togglePin(id: string): Promise<import("@team-chat/shared").Message>;
-    toggleReaction(id: string, body: ToggleReactionDto): Promise<import("@team-chat/shared").Message>;
+    toggleReaction(user: RequestUser, id: string, body: ToggleReactionDto): Promise<import("@team-chat/shared").Message>;
     getReplies(id: string): Promise<import("@team-chat/shared").Message[]>;
-    markAsRead(id: string): Promise<{
+    markAsRead(user: RequestUser, id: string): Promise<{
         success: boolean;
-    }>;
-    summarizeThread(id: string): Promise<{
-        summary: string;
-        decisions: string[];
-        openQuestions: string[];
-        actionItems: {
-            owner: string;
-            task: string;
-        }[];
-        blockers: string[];
     }>;
 }
