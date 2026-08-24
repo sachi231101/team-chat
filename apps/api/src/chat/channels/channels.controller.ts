@@ -11,25 +11,31 @@ import { ChannelsService } from './channels.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { AddChannelMembersDto } from './dto/add-member.dto';
 import { ChannelMemberGuard } from '../../common/guards';
+import { CurrentUser } from '../../common/decorators';
+import type { RequestUser } from '../../common/request-user';
 
 @Controller('channels')
 export class ChannelsController {
   constructor(private readonly channelsService: ChannelsService) {}
 
   @Get()
-  findAll() {
-    return this.channelsService.findAll();
+  findAll(@CurrentUser() user: RequestUser) {
+    return this.channelsService.findAll(user.workplaceId, user.id);
   }
 
   @Get(':id')
   @UseGuards(ChannelMemberGuard)
-  findOne(@Param('id') id: string) {
-    return this.channelsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.channelsService.findOne(id, user.workplaceId);
   }
 
   @Post()
-  create(@Body() body: CreateChannelDto) {
-    return this.channelsService.create(body);
+  create(@CurrentUser() user: RequestUser, @Body() body: CreateChannelDto) {
+    return this.channelsService.create({
+      ...body,
+      createdById: user.id,
+      workplaceId: user.workplaceId,
+    });
   }
 
   @Get(':id/members')

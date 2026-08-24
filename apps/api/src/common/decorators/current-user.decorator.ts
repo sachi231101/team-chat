@@ -1,13 +1,15 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { readUserFromHeaders, RequestUser } from '../request-user';
 
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext) => {
+  (_data: unknown, ctx: ExecutionContext): RequestUser => {
     const request = ctx.switchToHttp().getRequest();
-    return (
-      request.user || {
-        id: request.headers['x-user-id'] || 'usr-rahul',
-        workplaceId: request.headers['x-workplace-id'] || 'wp-teamchat-main',
-      }
-    );
+    if (request.user?.id) {
+      return {
+        id: request.user.id,
+        workplaceId: request.user.workplaceId ?? readUserFromHeaders(request.headers).workplaceId,
+      };
+    }
+    return readUserFromHeaders(request.headers);
   },
 );

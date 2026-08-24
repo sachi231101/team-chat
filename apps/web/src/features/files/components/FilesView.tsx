@@ -8,7 +8,8 @@ import {
   Calendar,
   ExternalLink,
 } from 'lucide-react';
-import { useChatDataStore } from '../../../stores';
+import { useUiStore } from '../../../stores';
+import { useWorkspace, useActiveMessages } from '../../../hooks';
 import { Avatar } from '../../../components/ui';
 
 type FileFilter = 'all' | 'images' | 'documents' | 'media';
@@ -16,7 +17,9 @@ type FileFilter = 'all' | 'images' | 'documents' | 'media';
 export const FilesView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FileFilter>('all');
-  const { messages, channels, setActiveChannel } = useChatDataStore();
+  const { setActiveChannel } = useUiStore();
+  const { channels } = useWorkspace();
+  const { messages } = useActiveMessages();
 
   // Aggregate all attachments from all messages
   const allFiles = messages.flatMap((msg) =>
@@ -31,47 +34,7 @@ export const FilesView: React.FC = () => {
     })),
   );
 
-  // Fallback initial sample files if messages haven't loaded many attachments yet
-  const sampleFiles = [
-    {
-      id: 'f-1',
-      name: 'design-system-v2.png',
-      size: 1024 * 1024 * 1.8,
-      type: 'image/png',
-      url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-      messageId: 'msg-gen-2',
-      channelId: 'chn-general',
-      senderName: 'Priya Patel',
-      senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-      createdAt: '2026-01-04T02:45:00.000Z',
-    },
-    {
-      id: 'f-2',
-      name: 'api-architecture-spec.pdf',
-      size: 1024 * 1024 * 3.4,
-      type: 'application/pdf',
-      url: '#',
-      messageId: 'msg-eng-1',
-      channelId: 'chn-engineering',
-      senderName: 'Arjun Mehta',
-      senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      createdAt: '2026-01-04T09:50:00.000Z',
-    },
-    {
-      id: 'f-3',
-      name: 'q3-product-roadmap.key',
-      size: 1024 * 1024 * 8.2,
-      type: 'application/presentation',
-      url: '#',
-      messageId: 'msg-gen-1',
-      channelId: 'chn-general',
-      senderName: 'Rahul Sharma',
-      senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      createdAt: '2026-01-04T02:30:00.000Z',
-    },
-  ];
-
-  const filesList = allFiles.length > 0 ? allFiles : sampleFiles;
+  const filesList = allFiles;
 
   const filteredFiles = filesList.filter((file) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());

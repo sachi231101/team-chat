@@ -1,20 +1,14 @@
 import React, { useState } from 'react';
 import { Smile, Check, UserPlus, Users, Sparkles } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { Modal, Button, Avatar, Input } from '../ui';
 import { UserStatus } from '@team-chat/shared';
 
 export const ProfileModal: React.FC = () => {
-  const {
-    profileModalOpen,
-    setProfileModalOpen,
-    currentUser,
-    setCurrentUser,
-    setCurrentUserStatus,
-    updateCurrentUserProfile,
-    createNewUser,
-    users,
-  } = useChatDataStore();
+  const { profileModalOpen, setProfileModalOpen } = useUiStore();
+  const { currentUser, users } = useWorkspace();
+  const { updateStatus, updateProfile, createUser, switchUser } = useChatMutations();
 
   const [tab, setTab] = useState<'profile' | 'switch' | 'create'>('profile');
   const [name, setName] = useState(currentUser.name);
@@ -33,8 +27,8 @@ export const ProfileModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await setCurrentUserStatus(status, statusMessage);
-    await updateCurrentUserProfile(name, title, email, avatarUrl);
+    await updateStatus.mutateAsync({ status, statusMessage });
+    await updateProfile.mutateAsync({ name, title, email, avatarUrl });
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -47,13 +41,13 @@ export const ProfileModal: React.FC = () => {
     if (!newUserName.trim() || !newUserEmail.trim()) return;
     setCreating(true);
     try {
-      const created = await createNewUser({
+      const created = await createUser.mutateAsync({
         name: newUserName.trim(),
         email: newUserEmail.trim().toLowerCase(),
         title: newUserTitle.trim() || undefined,
         avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(newUserName)}`,
       });
-      setCurrentUser(created);
+      switchUser(created);
       setCreating(false);
       setSaved(true);
       setTimeout(() => {
@@ -248,7 +242,7 @@ export const ProfileModal: React.FC = () => {
                   key={u.id}
                   type="button"
                   onClick={() => {
-                    setCurrentUser(u);
+                    switchUser(u);
                     setName(u.name);
                     setTitle(u.title || '');
                     setEmail(u.email);

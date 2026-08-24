@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import { Bell, AtSign, MessageSquare, Heart, CheckCheck, ExternalLink } from 'lucide-react';
-import { useChatDataStore } from '../../../stores';
+import { useUiStore } from '../../../stores';
+import { useWorkspace, useChatMutations } from '../../../hooks';
 import { formatTimestamp } from '../../../utils';
 
 type ActivityFilter = 'all' | 'mentions' | 'replies' | 'reactions';
 
 export const ActivityView: React.FC = () => {
   const [filter, setFilter] = useState<ActivityFilter>('all');
-  const {
-    notifications,
-    channels,
-    markNotificationAsRead,
-    markAllNotificationsAsRead,
-    setActiveChannel,
-    setActiveRailTab,
-  } = useChatDataStore();
+  const { setActiveChannel, setActiveRailTab } = useUiStore();
+  const { notifications, channels } = useWorkspace();
+  const { markNotificationAsRead, markAllNotificationsAsRead } = useChatMutations();
 
   const filtered = notifications.filter((item) => {
     if (filter === 'mentions') return item.type === 'mention';
@@ -52,7 +48,7 @@ export const ActivityView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => markAllNotificationsAsRead()}
+          onClick={() => markAllNotificationsAsRead.mutate()}
           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors hover:bg-white/10"
           style={{ color: 'var(--color-accent)' }}
         >
@@ -99,7 +95,7 @@ export const ActivityView: React.FC = () => {
             <div
               key={item.id}
               onClick={() => {
-                markNotificationAsRead(item.id);
+                markNotificationAsRead.mutate(item.id);
                 if (item.channelId) {
                   setActiveChannel(item.channelId);
                   setActiveRailTab('home');

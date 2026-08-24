@@ -14,6 +14,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePresenceDto } from '../presence/dto/update-presence.dto';
 import { UserStatus as PrismaUserStatus } from '@prisma/client';
+import { isPrismaNotFound } from './prisma-errors';
 import { User, UserStatus } from '@team-chat/shared';
 
 @Controller('users')
@@ -140,7 +141,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
-      if ((error as any).code === 'P2025') {
+      if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
       throw new InternalServerErrorException(
@@ -176,7 +177,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
-      if ((error as any).code === 'P2025') {
+      if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
       throw new InternalServerErrorException(
@@ -191,7 +192,7 @@ export class UsersController {
       await this.prisma.user.delete({ where: { id } });
       return { success: true };
     } catch (error) {
-      if ((error as any).code === 'P2025') {
+      if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
       throw new InternalServerErrorException(

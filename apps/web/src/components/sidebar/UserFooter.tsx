@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Settings, Smile, ChevronRight, Check } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { Avatar } from '../ui';
 import { UserStatus } from '@team-chat/shared';
 import { cn } from '../../lib/utils';
 
 export const UserFooter: React.FC = () => {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const { currentUser, setCurrentUserStatus, setSettingsModalOpen, setProfileModalOpen } =
-    useChatDataStore();
+  const { setSettingsModalOpen, setProfileModalOpen } = useUiStore();
+  const { currentUser } = useWorkspace();
+  const { updateStatus } = useChatMutations();
 
   const statuses: { label: string; value: UserStatus; color: string }[] = [
     { label: 'Online', value: 'online', color: 'bg-emerald-500' },
@@ -37,7 +39,7 @@ export const UserFooter: React.FC = () => {
                 <button
                   key={s.value}
                   onClick={() => {
-                    setCurrentUserStatus(s.value);
+                    updateStatus.mutate({ status: s.value });
                     setStatusMenuOpen(false);
                   }}
                   className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"

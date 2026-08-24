@@ -11,7 +11,8 @@ import {
   Moon,
   Sun,
 } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace } from '../../hooks';
 import { Tooltip } from '../ui';
 import { MoreMenuPopover } from './MoreMenuPopover';
 import { cn } from '../../lib/utils';
@@ -24,11 +25,10 @@ export const IconRail: React.FC = () => {
     setProfileModalOpen,
     setPeopleModalOpen,
     setCreateChannelModalOpen,
-    currentUser,
-    notifications,
     theme,
     setTheme,
-  } = useChatDataStore();
+  } = useUiStore();
+  const { currentUser, notifications } = useWorkspace();
 
   const unreadActivity = notifications.filter((n) => n.unread).length;
 

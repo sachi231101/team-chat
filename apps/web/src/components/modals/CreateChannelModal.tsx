@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Hash, Lock } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useChatMutations } from '../../hooks';
 import { Modal, Input, Button } from '../ui';
 import { cn } from '../../lib/utils';
 
 export const CreateChannelModal: React.FC = () => {
-  const { createChannelModalOpen, setCreateChannelModalOpen, createChannel } = useChatDataStore();
+  const { createChannelModalOpen, setCreateChannelModalOpen } = useUiStore();
+  const { createChannel } = useChatMutations();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -25,7 +27,7 @@ export const CreateChannelModal: React.FC = () => {
       setError('Channel name is required');
       return;
     }
-    createChannel(name, description, topic, type);
+    createChannel.mutate({ name, description, topic, type });
     setName('');
     setDescription('');
     setTopic('');

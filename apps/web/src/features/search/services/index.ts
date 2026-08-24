@@ -1,1 +1,1 @@
-export const SEARCH_SERVICES = true;
+export { chatService as searchService } from '../../../services/chatService';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Search, UserPlus, AlertCircle } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { chatService } from '../../services';
 import { Modal, Button, Avatar, Input } from '../ui';
 import { cn } from '../../lib/utils';
@@ -12,8 +13,8 @@ export const InviteModal: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const { inviteModalOpen, setInviteModalOpen, users, currentUser, activeId, channels } =
-    useChatDataStore();
+  const { inviteModalOpen, setInviteModalOpen, activeId } = useUiStore();
+  const { users, currentUser, channels } = useWorkspace();
 
   const currentChannel = channels.find((c) => c.id === activeId);
 

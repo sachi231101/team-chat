@@ -1,1 +1,1 @@
-export const CHAT_HOOKS = true;
+export { useWorkspace, useActiveMessages, useChatMutations, useMessagesQuery } from '../../../hooks/useChatQueries';

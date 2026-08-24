@@ -1,12 +1,12 @@
 import { Module, Global } from '@nestjs/common';
-import { DataStoreService } from './data-store.service';
 import { PrismaService } from './prisma.service';
 import { UsersController } from './users.controller';
+import { ChatAccessService } from './chat-access.service';
 
 @Global()
 @Module({
   controllers: [UsersController],
-  providers: [DataStoreService, PrismaService],
-  exports: [DataStoreService, PrismaService],
+  providers: [PrismaService, ChatAccessService],
+  exports: [PrismaService, ChatAccessService],
 })
 export class CommonModule {}

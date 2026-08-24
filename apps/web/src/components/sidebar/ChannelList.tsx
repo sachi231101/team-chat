@@ -1,11 +1,12 @@
 import React from 'react';
 import { Hash, Lock, Plus } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace } from '../../hooks';
 import { Tooltip } from '../ui';
 
 export const ChannelList: React.FC = () => {
-  const { channels, activeId, activeType, setActiveChannel, setCreateChannelModalOpen } =
-    useChatDataStore();
+  const { activeId, activeType, setActiveChannel, setCreateChannelModalOpen } = useUiStore();
+  const { channels } = useWorkspace();
 
   return (
     <div className="space-y-px">

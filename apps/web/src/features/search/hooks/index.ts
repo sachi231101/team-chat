@@ -1,1 +1,1 @@
-export const SEARCH_HOOKS = true;
+export { useWorkspace } from '../../../hooks/useChatQueries';

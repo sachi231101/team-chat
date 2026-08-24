@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Hash, Lock, Loader2, ArrowRight, Bookmark, FileText, Bell, MessageSquare, Settings, User as UserIcon, Sparkles } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { chatService } from '../../services';
 import { Avatar } from '../ui';
 import { formatTimestamp } from '../../utils';
@@ -29,14 +30,13 @@ export const SearchModal: React.FC = () => {
   const {
     searchModalOpen,
     setSearchModalOpen,
-    channels,
-    users,
     setActiveChannel,
-    createConversation,
     setActiveRailTab,
     setProfileModalOpen,
     setSettingsModalOpen,
-  } = useChatDataStore();
+  } = useUiStore();
+  const { channels, users } = useWorkspace();
+  const { createConversation } = useChatMutations();
 
   const quickActions: QuickAction[] = useMemo(() => [
     {
@@ -301,7 +301,7 @@ export const SearchModal: React.FC = () => {
                   <button
                     key={u.id}
                     onClick={() => {
-                      createConversation(u.id);
+                      createConversation.mutate(u.id);
                       setSearchModalOpen(false);
                     }}
                     className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600 hover:text-white transition-colors group"

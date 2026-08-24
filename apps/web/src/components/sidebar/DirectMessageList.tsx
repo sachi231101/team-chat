@@ -1,11 +1,12 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace } from '../../hooks';
 import { Avatar } from '../ui';
 
 export const DirectMessageList: React.FC = () => {
-  const { conversations, users, currentUser, activeId, activeType, setActiveConversation, setPeopleModalOpen } =
-    useChatDataStore();
+  const { activeId, activeType, setActiveConversation, setPeopleModalOpen } = useUiStore();
+  const { conversations, users, currentUser } = useWorkspace();
 
   return (
     <div className="space-y-px">

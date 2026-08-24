@@ -6,8 +6,8 @@ export const createMessageSchema = z.object({
   content: z.string().min(1, 'Message cannot be empty').max(4000),
   parentMessageId: z.string().optional(),
   attachments: z.array(z.string().url()).optional(),
-}).refine(data => Boolean(data.channelId || data.conversationId), {
-  message: 'Either channelId or conversationId must be provided',
+}).refine((data) => Boolean(data.channelId) !== Boolean(data.conversationId), {
+  message: 'Provide exactly one of channelId or conversationId',
 });
 
 export const addReactionSchema = z.object({

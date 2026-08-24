@@ -5,48 +5,35 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { ChatAccessService } from '../chat-access.service';
+import { readUserFromHeaders } from '../request-user';
 
 @Injectable()
 export class ChannelMemberGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly chatAccess: ChatAccessService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const userId =
-      req.headers['x-user-id'] || req.body?.senderId || 'usr-rahul';
+    const { id: userId } = readUserFromHeaders(req.headers);
 
-    // Extract channelId from params, query, or body
     const channelId =
-      req.params?.id ||
       req.params?.channelId ||
+      (req.route?.path?.includes('channels') ? req.params?.id : undefined) ||
       req.query?.channelId ||
       req.body?.channelId;
 
     if (!channelId) {
-      return true; // Not a channel-specific request
-    }
-
-    const channel = await this.prisma.channel.findUnique({
-      where: { id: channelId },
-      include: { members: true },
-    });
-
-    if (!channel) {
-      throw new NotFoundException(`Channel ${channelId} not found`);
-    }
-
-    if (channel.type === 'PUBLIC') {
       return true;
     }
 
-    const isMember = channel.members.some((m) => m.userId === userId);
-    if (!isMember) {
-      throw new ForbiddenException(
-        'Access denied: You are not a member of this private channel',
-      );
+    try {
+      await this.chatAccess.assertChannelAccess(userId, channelId);
+      return true;
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw error;
     }
-
-    return true;
   }
 }

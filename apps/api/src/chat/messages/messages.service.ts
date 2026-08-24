@@ -1,30 +1,62 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Prisma, Message as PrismaMessage, User, MessageReaction, Attachment } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { Message } from '@team-chat/shared';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { RealtimeService } from '../../realtime/realtime.service';
+import { MentionsService } from '../mentions/mentions.service';
+
+type MessageWithRelations = PrismaMessage & {
+  sender: User | null;
+  reactions: (MessageReaction & { user: User | null })[];
+  attachments: Attachment[];
+  replies?: PrismaMessage[];
+};
+
+export interface MessageListResult {
+  items: Message[];
+  nextCursor: string | null;
+  lastReadMessageId: string | null;
+}
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+    private readonly mentions: MentionsService,
+  ) {}
 
   async findAll(
+    userId: string,
     channelId?: string,
     conversationId?: string,
     limit: number = 50,
     cursor?: string,
-  ): Promise<Message[]> {
+  ): Promise<MessageListResult> {
+    if (!channelId && !conversationId) {
+      throw new BadRequestException('channelId or conversationId is required');
+    }
+
     try {
-      const where: Record<string, unknown> = {
+      const where: Prisma.MessageWhereInput = {
         deletedAt: null,
+        parentMessageId: null,
       };
       if (channelId) where.channelId = channelId;
       if (conversationId) where.conversationId = conversationId;
 
       const take = Math.min(Math.max(Number(limit) || 50, 1), 100);
 
-      const messages = await this.prisma.message.findMany({
+      const rows = await this.prisma.message.findMany({
         where,
-        take,
+        take: take + 1,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         include: {
           sender: true,
@@ -35,11 +67,29 @@ export class MessagesService {
             orderBy: { createdAt: 'asc' },
           },
         },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
 
-      return messages.map((m) => this.mapMessageToDto(m));
+      const hasMore = rows.length > take;
+      const page = hasMore ? rows.slice(0, take) : rows;
+      const chronological = [...page].reverse();
+
+      const lastRead = await this.prisma.readReceipt.findFirst({
+        where: {
+          userId,
+          message: channelId ? { channelId } : { conversationId },
+        },
+        orderBy: { readAt: 'desc' },
+        include: { message: { select: { id: true, createdAt: true } } },
+      });
+
+      return {
+        items: chronological.map((m) => this.mapMessageToDto(m)),
+        nextCursor: hasMore ? page[page.length - 1].id : null,
+        lastReadMessageId: lastRead?.messageId ?? null,
+      };
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       throw new InternalServerErrorException(
         `Failed to fetch messages: ${(error as Error).message}`,
       );
@@ -74,28 +124,35 @@ export class MessagesService {
     }
   }
 
-  async create(body: CreateMessageDto): Promise<Message> {
-    const senderId = body.senderId || 'usr-rahul';
+  async create(userId: string, body: CreateMessageDto): Promise<Message> {
+    const hasChannel = Boolean(body.channelId);
+    const hasConversation = Boolean(body.conversationId);
+    if (hasChannel === hasConversation) {
+      throw new BadRequestException(
+        'Provide exactly one of channelId or conversationId',
+      );
+    }
 
     try {
       const m = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
           data: {
             content: body.content,
-            senderId,
+            senderId: userId,
             channelId: body.channelId,
             conversationId: body.conversationId,
             parentMessageId: body.parentMessageId,
-            attachments: body.attachments && body.attachments.length > 0
-              ? {
-                  create: body.attachments.map((a) => ({
-                    name: a.name,
-                    size: Math.round(a.size),
-                    type: a.type,
-                    url: a.url,
-                  })),
-                }
-              : undefined,
+            attachments:
+              body.attachments && body.attachments.length > 0
+                ? {
+                    create: body.attachments.map((a) => ({
+                      name: a.name,
+                      size: Math.round(a.size),
+                      type: a.type,
+                      url: a.url,
+                    })),
+                  }
+                : undefined,
           },
           include: {
             sender: true,
@@ -108,7 +165,6 @@ export class MessagesService {
           },
         });
 
-        // If in a conversation, touch conversation updatedAt
         if (body.conversationId) {
           await tx.conversation.update({
             where: { id: body.conversationId },
@@ -116,7 +172,6 @@ export class MessagesService {
           });
         }
 
-        // If in a channel, touch channel updatedAt
         if (body.channelId) {
           await tx.channel.update({
             where: { id: body.channelId },
@@ -128,21 +183,25 @@ export class MessagesService {
       });
 
       const dto = this.mapMessageToDto(m);
-      // Trigger AI teammate bot response if message contains bot mention
-      void this.triggerBotReplyIfNeeded(dto);
+      this.realtime.emitToChat(dto, 'message:created', dto);
+      void this.mentions.notifyFromMessage(dto);
       return dto;
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       throw new InternalServerErrorException(
         `Failed to create message: ${(error as Error).message}`,
       );
     }
   }
 
-  async update(id: string, content: string): Promise<Message> {
+  async update(id: string, content: string, userId: string): Promise<Message> {
     try {
       const existing = await this.prisma.message.findUnique({ where: { id } });
       if (!existing || existing.deletedAt) {
         throw new NotFoundException(`Message ${id} not found`);
+      }
+      if (existing.senderId !== userId) {
+        throw new ForbiddenException('You can only edit your own messages');
       }
 
       const m = await this.prisma.message.update({
@@ -159,23 +218,29 @@ export class MessagesService {
         },
       });
 
-      return this.mapMessageToDto(m);
+      const dto = this.mapMessageToDto(m);
+      this.realtime.emitToChat(dto, 'message:updated', dto);
+      return dto;
     } catch (error) {
-      if (error instanceof NotFoundException) throw error;
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         `Failed to update message ${id}: ${(error as Error).message}`,
       );
     }
   }
 
-  async delete(id: string): Promise<{ success: boolean }> {
+  async delete(id: string, userId: string): Promise<{ success: boolean }> {
     try {
       const existing = await this.prisma.message.findUnique({ where: { id } });
       if (!existing) {
         throw new NotFoundException(`Message ${id} not found`);
       }
+      if (existing.senderId !== userId) {
+        throw new ForbiddenException('You can only delete your own messages');
+      }
 
-      // Soft delete to preserve conversation flow
       await this.prisma.message.update({
         where: { id },
         data: {
@@ -184,9 +249,12 @@ export class MessagesService {
         },
       });
 
+      this.realtime.emitToChat(existing, 'message:deleted', { id });
       return { success: true };
     } catch (error) {
-      if (error instanceof NotFoundException) throw error;
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         `Failed to delete message ${id}: ${(error as Error).message}`,
       );
@@ -214,7 +282,9 @@ export class MessagesService {
         },
       });
 
-      return this.mapMessageToDto(m);
+      const dto = this.mapMessageToDto(m);
+      this.realtime.emitToChat(dto, 'pin:toggled', { messageId: id, message: dto });
+      return dto;
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException(
@@ -223,12 +293,7 @@ export class MessagesService {
     }
   }
 
-  async toggleReaction(
-    messageId: string,
-    emoji: string,
-    userId: string = 'usr-rahul',
-    _userName?: string,
-  ): Promise<Message> {
+  async toggleReaction(messageId: string, emoji: string, userId: string): Promise<Message> {
     try {
       const message = await this.prisma.message.findUnique({ where: { id: messageId } });
       if (!message || message.deletedAt) {
@@ -261,7 +326,12 @@ export class MessagesService {
         }
       });
 
-      return this.findOne(messageId);
+      const dto = await this.findOne(messageId);
+      this.realtime.emitToChat(dto, 'reaction:toggled', {
+        messageId,
+        message: dto,
+      });
+      return dto;
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException(
@@ -294,7 +364,7 @@ export class MessagesService {
     }
   }
 
-  async markAsRead(messageId: string, userId: string = 'usr-rahul'): Promise<{ success: boolean }> {
+  async markAsRead(messageId: string, userId: string): Promise<{ success: boolean }> {
     try {
       await this.prisma.readReceipt.upsert({
         where: {
@@ -319,139 +389,68 @@ export class MessagesService {
     }
   }
 
-  async summarizeThread(messageId: string): Promise<{
-    summary: string;
-    decisions: string[];
-    openQuestions: string[];
-    actionItems: { owner: string; task: string }[];
-    blockers: string[];
-  }> {
-    try {
-      const parent = await this.findOne(messageId);
-      const replies = await this.getReplies(messageId);
-
-      const allMessages = [parent, ...replies];
-      const combinedText = allMessages.map((m) => `${m.senderName}: ${m.content}`).join('\n');
-
-      // Extract key discussion elements heuristically / deterministically
-      const decisions: string[] = [];
-      const openQuestions: string[] = [];
-      const actionItems: { owner: string; task: string }[] = [];
-      const blockers: string[] = [];
-
-      allMessages.forEach((m) => {
-        const text = m.content;
-        const sender = m.senderName;
-
-        if (text.includes('?')) {
-          const sentences = text.split(/[.\n]/).filter((s) => s.includes('?'));
-          sentences.forEach((q) => {
-            if (q.trim().length > 5) openQuestions.push(q.trim());
-          });
-        }
-
-        if (/agreed|decided|approved|moving|finalized|done/i.test(text)) {
-          decisions.push(text.split(/[.\n]/)[0].trim());
-        }
-
-        if (/blocker|blocked|waiting on|pending|issue/i.test(text)) {
-          blockers.push(text.split(/[.\n]/)[0].trim());
-        }
-
-        if (/will |I'll |take over|handling|working on/i.test(text)) {
-          actionItems.push({
-            owner: sender,
-            task: text.split(/[.\n]/)[0].trim(),
-          });
-        }
-      });
-
-      // Provide sensible defaults if discussion is brief
-      if (decisions.length === 0) {
-        decisions.push(`Discussion concluded on #${parent.content.slice(0, 45)}`);
-      }
-      if (openQuestions.length === 0 && replies.length > 2) {
-        openQuestions.push('Pending final sign-off from stakeholders.');
-      }
-      if (actionItems.length === 0) {
-        actionItems.push({
-          owner: parent.senderName,
-          task: 'Coordinate next milestone deliverables',
-        });
-      }
-
-      const summaryText = `Thread with ${allMessages.length} messages across ${new Set(allMessages.map((m) => m.senderName)).size} participants. Key focus: "${parent.content.slice(0, 60)}..."`;
-
-      return {
-        summary: summaryText,
-        decisions: Array.from(new Set(decisions)).slice(0, 4),
-        openQuestions: Array.from(new Set(openQuestions)).slice(0, 3),
-        actionItems: actionItems.slice(0, 4),
-        blockers: Array.from(new Set(blockers)).slice(0, 3),
-      };
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to generate thread summary: ${(error as Error).message}`,
-      );
-    }
+  async findPinnedForUser(userId: string): Promise<Message[]> {
+    const memberships = await this.prisma.channelMember.findMany({
+      where: { userId },
+      select: { channelId: true },
+    });
+    const convos = await this.prisma.conversationParticipant.findMany({
+      where: { userId },
+      select: { conversationId: true },
+    });
+    const rows = await this.prisma.message.findMany({
+      where: {
+        pinned: true,
+        deletedAt: null,
+        OR: [
+          { channel: { type: 'PUBLIC' } },
+          { channelId: { in: memberships.map((m) => m.channelId) } },
+          { conversationId: { in: convos.map((c) => c.conversationId) } },
+        ],
+      },
+      include: {
+        sender: true,
+        reactions: { include: { user: true } },
+        attachments: true,
+        replies: { where: { deletedAt: null } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return rows.map((m) => this.mapMessageToDto(m));
   }
 
-  async triggerBotReplyIfNeeded(createdMessage: Message) {
-    const text = createdMessage.content;
-    let botId: string | null = null;
-    let botName = '';
-    let responseText = '';
-
-    if (text.includes('@ResearchAgent') || text.toLowerCase().startsWith('/research')) {
-      botId = 'usr-agent-research';
-      botName = 'ResearchAgent';
-      const topic = text.replace(/@ResearchAgent|\/research/gi, '').trim() || 'your query';
-      responseText = `🤖 **ResearchAgent Synthesis** for _"${topic}"_:\n\n` +
-        `• **Architecture Assessment**: High throughput and modular separation align with system design requirements.\n` +
-        `• **Benchmark Comparison**: Benchmarks indicate a ~35% latency reduction under concurrent load.\n` +
-        `• **Recommended Next Step**: Implement proof-of-concept branch and run end-to-end integration tests.\n\n` +
-        `_Sources: PostgreSQL 16 Docs, Redis 7 Pub/Sub Spec, Internal Architecture RFC_`;
-    } else if (text.includes('@MeetingAgent') || text.toLowerCase().startsWith('/meeting')) {
-      botId = 'usr-agent-meeting';
-      botName = 'MeetingAgent';
-      responseText = `📋 **MeetingAgent Agenda & Summary**:\n\n` +
-        `1. **Sprint Review**: V1 Release checklist & frontend-backend integration.\n` +
-        `2. **Decisions**: Finalized dark/light theme tokens and message reaction schemas.\n` +
-        `3. **Assigned Actions**: @Rahul Sharma (Deploy staging), @Priya Patel (UI spec sign-off).\n\n` +
-        `_Generated automatically from channel context._`;
-    } else if (text.includes('@SupportAgent') || text.toLowerCase().startsWith('/support')) {
-      botId = 'usr-agent-support';
-      botName = 'SupportAgent';
-      responseText = `🛡️ **SupportAgent Incident Status**:\n\n` +
-        `• **Current Health**: All microservices reporting 99.98% uptime.\n` +
-        `• **Resolved Issues**: 0 open critical alerts in this workspace.\n` +
-        `• **Diagnostic**: Database pool connections operating at optimal capacity.\n\n` +
-        `_Telemetry synced with Monitoring Engine._`;
+  async findPinned(channelId?: string, conversationId?: string): Promise<Message[]> {
+    if (!channelId && !conversationId) {
+      throw new BadRequestException('channelId or conversationId is required');
     }
+    const where: Prisma.MessageWhereInput = {
+      pinned: true,
+      deletedAt: null,
+    };
+    if (channelId) where.channelId = channelId;
+    if (conversationId) where.conversationId = conversationId;
 
-    if (botId) {
-      setTimeout(async () => {
-        try {
-          await this.create({
-            content: responseText,
-            senderId: botId!,
-            channelId: createdMessage.channelId,
-            conversationId: createdMessage.conversationId,
-            parentMessageId: createdMessage.parentMessageId,
-          });
-        } catch {
-          // Ignore bot dispatch error in background
-        }
-      }, 700);
-    }
+    const rows = await this.prisma.message.findMany({
+      where,
+      include: {
+        sender: true,
+        reactions: { include: { user: true } },
+        attachments: true,
+        replies: { where: { deletedAt: null } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return rows.map((m) => this.mapMessageToDto(m));
   }
 
-  private mapMessageToDto(m: any): Message {
+  mapMessageToDto(m: MessageWithRelations): Message {
     return {
       id: m.id,
       content: m.content,
       senderId: m.senderId,
-      senderName: m.sender?.name || 'Rahul Sharma',
+      senderName: m.sender?.name || 'Unknown',
       senderAvatar: m.sender?.avatarUrl ?? undefined,
       channelId: m.channelId ?? undefined,
       conversationId: m.conversationId ?? undefined,
@@ -464,7 +463,7 @@ export class MessagesService {
           ? m.replies[m.replies.length - 1].createdAt.toISOString()
           : undefined,
       reactions: m.reactions
-        ? m.reactions.map((r: any) => ({
+        ? m.reactions.map((r) => ({
             id: r.id,
             emoji: r.emoji,
             userId: r.userId,
@@ -473,12 +472,13 @@ export class MessagesService {
           }))
         : [],
       attachments: m.attachments
-        ? m.attachments.map((a: any) => ({
+        ? m.attachments.map((a) => ({
             id: a.id,
             name: a.name,
             size: a.size,
             type: a.type,
             url: a.url,
+            createdAt: a.createdAt.toISOString(),
           }))
         : [],
       createdAt: m.createdAt.toISOString(),

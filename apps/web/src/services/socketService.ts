@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { Message, User } from '@team-chat/shared';
+import { getStoredUserId } from '../lib/currentUser';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -11,14 +12,10 @@ class SocketService {
       this.socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'],
         autoConnect: true,
-      });
-
-      this.socket.on('connect', () => {
-        console.log('🟢 Socket connected to backend:', this.socket?.id);
-      });
-
-      this.socket.on('disconnect', () => {
-        console.log('🔴 Socket disconnected from backend');
+        auth: {
+          userId: getStoredUserId(),
+          workplaceId: 'wp-teamchat-main',
+        },
       });
     }
     return this.socket;
@@ -40,36 +37,16 @@ class SocketService {
     this.socket?.emit('conversation:join', { conversationId });
   }
 
-  sendMessage(data: Partial<Message> & { content: string; senderId: string; senderName: string }) {
-    this.socket?.emit('message:send', data);
+  updatePresence(status: 'online' | 'busy' | 'away' | 'offline', statusMessage?: string) {
+    this.socket?.emit('presence:update', { status, statusMessage });
   }
 
-  editMessage(id: string, content: string) {
-    this.socket?.emit('message:edit', { id, content });
+  startTyping(userName: string, channelId?: string, conversationId?: string) {
+    this.socket?.emit('typing:start', { userName, channelId, conversationId });
   }
 
-  deleteMessage(id: string) {
-    this.socket?.emit('message:delete', { id });
-  }
-
-  toggleReaction(messageId: string, emoji: string, userId: string, userName: string) {
-    this.socket?.emit('reaction:toggle', { messageId, emoji, userId, userName });
-  }
-
-  togglePin(messageId: string) {
-    this.socket?.emit('pin:toggle', { messageId });
-  }
-
-  updatePresence(userId: string, status: 'online' | 'busy' | 'away' | 'offline', statusMessage?: string) {
-    this.socket?.emit('presence:update', { userId, status, statusMessage });
-  }
-
-  startTyping(userId: string, userName: string, channelId?: string, conversationId?: string) {
-    this.socket?.emit('typing:start', { userId, userName, channelId, conversationId });
-  }
-
-  stopTyping(userId: string, channelId?: string, conversationId?: string) {
-    this.socket?.emit('typing:stop', { userId, channelId, conversationId });
+  stopTyping(channelId?: string, conversationId?: string) {
+    this.socket?.emit('typing:stop', { channelId, conversationId });
   }
 
   onMessageCreated(callback: (message: Message) => void) {
@@ -125,6 +102,20 @@ class SocketService {
     this.socket?.on('typing:stopped', callback);
     return () => {
       this.socket?.off('typing:stopped', callback);
+    };
+  }
+
+  onConnect(callback: () => void) {
+    this.socket?.on('connect', callback);
+    return () => {
+      this.socket?.off('connect', callback);
+    };
+  }
+
+  onDisconnect(callback: () => void) {
+    this.socket?.on('disconnect', callback);
+    return () => {
+      this.socket?.off('disconnect', callback);
     };
   }
 }

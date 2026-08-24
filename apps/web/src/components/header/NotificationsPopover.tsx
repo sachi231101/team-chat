@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, CheckCheck, AtSign, MessageSquare, Heart, X } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui';
 
@@ -10,8 +11,9 @@ export interface NotificationsPopoverProps {
 }
 
 export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ isOpen, onClose }) => {
-  const { notifications, markNotificationAsRead, markAllNotificationsAsRead, setActiveChannel } =
-    useChatDataStore();
+  const { setActiveChannel } = useUiStore();
+  const { notifications } = useWorkspace();
+  const { markNotificationAsRead, markAllNotificationsAsRead } = useChatMutations();
 
   if (!isOpen) return null;
 
@@ -45,7 +47,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ isOp
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={markAllNotificationsAsRead}
+                onClick={markAllNotificationsAsRead.mutate}
                 className="text-xs text-slate-400 hover:text-slate-200 gap-1"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
@@ -69,7 +71,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ isOp
               <div
                 key={notif.id}
                 onClick={() => {
-                  markNotificationAsRead(notif.id);
+                  markNotificationAsRead.mutate(notif.id);
                   if (notif.channelId) {
                     setActiveChannel(notif.channelId);
                     onClose();

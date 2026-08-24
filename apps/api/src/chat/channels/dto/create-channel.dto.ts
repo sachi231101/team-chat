@@ -16,12 +16,4 @@ export class CreateChannelDto {
   @IsString()
   @IsIn(['public', 'private'])
   type: 'public' | 'private';
-
-  @IsString()
-  @IsOptional()
-  createdById?: string;
-
-  @IsString()
-  @IsOptional()
-  workplaceId?: string;
 }

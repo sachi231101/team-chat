@@ -4,5 +4,3 @@ export * from './InviteModal';
 export * from './ProfileModal';
 export * from './SettingsModal';
 export * from './PeopleModal';
-export * from './CreateTaskModal';
-export * from './CreateApprovalModal';

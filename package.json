@@ -12,7 +12,9 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "prisma:generate": "pnpm --filter api prisma:generate",
-    "prisma:migrate": "pnpm --filter api prisma:migrate"
+    "prisma:migrate": "pnpm --filter api prisma:migrate",
+    "test": "pnpm --filter api test",
+    "typecheck": "pnpm --recursive exec tsc --noEmit"
   },
   "keywords": [
     "team-chat",

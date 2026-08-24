@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
 import { Search, MessageSquare, Mail } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { Modal, Avatar, Button, Input, Badge } from '../ui';
 
 export const PeopleModal: React.FC = () => {
   const [search, setSearch] = useState('');
-  const {
-    peopleModalOpen,
-    setPeopleModalOpen,
-    users,
-    currentUser,
-    setActiveConversation,
-    conversations,
-  } = useChatDataStore();
+  const { peopleModalOpen, setPeopleModalOpen, setActiveConversation } = useUiStore();
+  const { users, currentUser, conversations } = useWorkspace();
+  const { createConversation } = useChatMutations();
 
   const filtered = users.filter(
     (u) =>
@@ -28,6 +24,8 @@ export const PeopleModal: React.FC = () => {
     );
     if (existing) {
       setActiveConversation(existing.id);
+    } else {
+      createConversation.mutate(userId);
     }
     setPeopleModalOpen(false);
   };

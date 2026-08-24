@@ -9,7 +9,8 @@ import {
   MoreHorizontal,
   PanelRight,
 } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace } from '../../hooks';
 import { Avatar, Tooltip } from '../ui';
 import { NotificationsPopover } from './NotificationsPopover';
 
@@ -23,13 +24,10 @@ export const AppHeader: React.FC = () => {
   const {
     activeId,
     activeType,
-    channels,
-    conversations,
-    users,
-    currentUser,
     toggleDetailsPanel,
     detailsPanelOpen,
-  } = useChatDataStore();
+  } = useUiStore();
+  const { channels, conversations, users, currentUser } = useWorkspace();
 
   const currentChannel = channels.find((c) => c.id === activeId);
   const currentConversation = conversations.find((c) => c.id === activeId);

@@ -1,9 +1,7 @@
-import { useChatDataStore } from '../stores';
+import { useWorkspace } from './useChatQueries';
 
 export function useCurrentUser() {
-  const currentUser = useChatDataStore((s) => s.currentUser);
-  const isLoading = useChatDataStore((s) => s.isLoading);
-
+  const { currentUser, isLoading } = useWorkspace();
   return {
     user: currentUser,
     isLoading,

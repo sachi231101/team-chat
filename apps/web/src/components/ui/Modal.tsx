@@ -48,6 +48,8 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Dialog box */}
       <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
           'relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl shadow-black/80 transition-all animate-in zoom-in-95',
           maxWidthMap[maxWidth],

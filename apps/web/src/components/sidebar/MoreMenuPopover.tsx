@@ -8,7 +8,7 @@ import {
   Layers,
   Workflow,
 } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
 
 export interface MoreMenuPopoverProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ export interface MoreMenuPopoverProps {
 }
 
 export const MoreMenuPopover: React.FC<MoreMenuPopoverProps> = ({ isOpen, onClose }) => {
-  const { setSettingsModalOpen, setSearchModalOpen } = useChatDataStore();
+  const { setSettingsModalOpen, setSearchModalOpen } = useUiStore();
 
   if (!isOpen) return null;
 

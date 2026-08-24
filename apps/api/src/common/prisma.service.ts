@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { PrismaClient, ChannelType, UserStatus, NotificationType } from '@prisma/client';
+import { PrismaClient, ChannelType, UserStatus, NotificationType, ChannelMemberRole } from '@prisma/client';
 
 @Injectable()
 export class PrismaService
@@ -193,7 +193,7 @@ export class PrismaService
             create: {
               channelId: c.id,
               userId: u.id,
-              role: u.id === c.createdById ? 'admin' : 'member',
+              role: u.id === c.createdById ? ChannelMemberRole.ADMIN : ChannelMemberRole.MEMBER,
             },
             update: {},
           });

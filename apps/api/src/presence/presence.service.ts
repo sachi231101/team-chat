@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, InternalServerErrorException } from '@ne
 import { PrismaService } from '../common/prisma.service';
 import { User, UserStatus as SharedUserStatus } from '@team-chat/shared';
 import { UserStatus as PrismaUserStatus } from '@prisma/client';
+import { isPrismaNotFound } from '../common/prisma-errors';
 
 @Injectable()
 export class PresenceService {
@@ -53,7 +54,7 @@ export class PresenceService {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
-      if ((error as any).code === 'P2025') {
+      if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${userId} not found`);
       }
       throw new InternalServerErrorException(

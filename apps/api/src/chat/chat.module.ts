@@ -5,6 +5,7 @@ import { MessagesModule } from './messages/messages.module';
 import { ThreadsModule } from './threads/threads.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { MentionsModule } from './mentions/mentions.module';
+import { SavedMessagesModule } from './saved-messages/saved-messages.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { MentionsModule } from './mentions/mentions.module';
     ThreadsModule,
     ReactionsModule,
     MentionsModule,
+    SavedMessagesModule,
   ],
   exports: [
     ChannelsModule,
@@ -22,6 +24,7 @@ import { MentionsModule } from './mentions/mentions.module';
     ThreadsModule,
     ReactionsModule,
     MentionsModule,
+    SavedMessagesModule,
   ],
 })
 export class ChatModule {}

@@ -1,15 +1,11 @@
 import React from 'react';
 import { Search, MessageSquare, Users, FolderOpen, Bookmark } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useActiveMessages } from '../../hooks';
 
 export const SidebarNav: React.FC = () => {
-  const {
-    openThread,
-    messages,
-    setPeopleModalOpen,
-    setDetailsTab,
-    setSearchModalOpen,
-  } = useChatDataStore();
+  const { openThread, setPeopleModalOpen, setDetailsTab, setSearchModalOpen } = useUiStore();
+  const { messages } = useActiveMessages();
 
   const threadsCount = messages.filter((m) => (m.replyCount || 0) > 0).length;
 

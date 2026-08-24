@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, X } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
 
 /**
- * Global error toast that renders when useChatDataStore has an error.
+ * Global error toast that renders when the UI store has an error.
  * Auto-dismisses after 5 seconds. The user can also dismiss manually.
  */
 export const ErrorToast: React.FC = () => {
-  const error = useChatDataStore((s) => s.error);
-  const clearError = useChatDataStore((s) => s.clearError);
+  const error = useUiStore((s) => s.error);
+  const clearError = useUiStore((s) => s.clearError);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

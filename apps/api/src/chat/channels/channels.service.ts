@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { Channel, User } from '@team-chat/shared';
-import { ChannelType } from '@prisma/client';
+import { ChannelType, ChannelMemberRole } from '@prisma/client';
 
 @Injectable()
 export class ChannelsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(workplaceId: string = 'wp-teamchat-main'): Promise<Channel[]> {
+  async findAll(workplaceId: string = 'wp-teamchat-main', userId?: string): Promise<Channel[]> {
     try {
       const channels = await this.prisma.channel.findMany({
-        where: { workplaceId },
+        where: {
+          workplaceId,
+          ...(userId
+            ? { OR: [{ type: ChannelType.PUBLIC }, { members: { some: { userId } } }] }
+            : {}),
+        },
         include: { members: true },
         orderBy: { createdAt: 'asc' },
       });
@@ -75,7 +80,10 @@ export class ChannelsService {
     createdById?: string;
     workplaceId?: string;
   }): Promise<Channel> {
-    const creatorId = data.createdById || 'usr-rahul';
+    const creatorId = data.createdById;
+    if (!creatorId) {
+      throw new InternalServerErrorException('createdById is required');
+    }
     const wpId = data.workplaceId || 'wp-teamchat-main';
     const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
 
@@ -92,7 +100,7 @@ export class ChannelsService {
             members: {
               create: {
                 userId: creatorId,
-                role: 'admin',
+                role: ChannelMemberRole.ADMIN,
               },
             },
           },
@@ -156,7 +164,7 @@ export class ChannelsService {
             where: {
               channelId_userId: { channelId, userId },
             },
-            create: { channelId, userId, role: 'member' },
+            create: { channelId, userId, role: ChannelMemberRole.MEMBER },
             update: {},
           }),
         ),

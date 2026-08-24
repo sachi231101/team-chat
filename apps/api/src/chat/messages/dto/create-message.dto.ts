@@ -1,21 +1,23 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class AttachmentInputDto {
+  @IsString()
+  name: string;
+
+  size: number;
+
+  @IsString()
+  type: string;
+
+  @IsString()
+  url: string;
+}
 
 export class CreateMessageDto {
   @IsString()
   @IsNotEmpty()
   content: string;
-
-  @IsString()
-  @IsOptional()
-  senderId?: string;
-
-  @IsString()
-  @IsOptional()
-  senderName?: string;
-
-  @IsString()
-  @IsOptional()
-  senderAvatar?: string;
 
   @IsString()
   @IsOptional()
@@ -31,10 +33,7 @@ export class CreateMessageDto {
 
   @IsArray()
   @IsOptional()
-  attachments?: {
-    name: string;
-    size: number;
-    type: string;
-    url: string;
-  }[];
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentInputDto)
+  attachments?: AttachmentInputDto[];
 }

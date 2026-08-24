@@ -12,6 +12,11 @@ enum ChannelType {
   PRIVATE
 }
 
+enum ChannelMemberRole {
+  MEMBER
+  ADMIN
+}
+
 enum UserStatus {
   ONLINE
   BUSY
@@ -38,13 +43,14 @@ model User {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  createdChannels        Channel[]                 @relation("ChannelCreator")
-  channelMemberships     ChannelMember[]
+  createdChannels         Channel[]                 @relation("ChannelCreator")
+  channelMemberships      ChannelMember[]
   conversationMemberships ConversationParticipant[]
-  sentMessages           Message[]                 @relation("SentMessages")
-  reactions              MessageReaction[]
-  notifications          Notification[]
-  readReceipts           ReadReceipt[]
+  sentMessages            Message[]                 @relation("SentMessages")
+  reactions               MessageReaction[]
+  notifications           Notification[]
+  readReceipts            ReadReceipt[]
+  savedMessages           SavedMessage[]
 
   @@index([workplaceId])
   @@map("users")
@@ -61,9 +67,9 @@ model Channel {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  createdBy   User            @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  members     ChannelMember[]
-  messages    Message[]
+  createdBy User            @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   ChannelMember[]
+  messages  Message[]
 
   @@unique([workplaceId, name])
   @@index([workplaceId])
@@ -71,11 +77,11 @@ model Channel {
 }
 
 model ChannelMember {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   channelId String
   userId    String
-  role      String   @default("member")
-  joinedAt  DateTime @default(now())
+  role      ChannelMemberRole @default(MEMBER)
+  joinedAt  DateTime          @default(now())
 
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -131,6 +137,7 @@ model Message {
   reactions     MessageReaction[]
   attachments   Attachment[]
   readReceipts  ReadReceipt[]
+  savedBy       SavedMessage[]
 
   @@index([channelId, createdAt])
   @@index([conversationId, createdAt])
@@ -167,14 +174,16 @@ model Attachment {
 }
 
 model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  title     String
-  body      String
-  type      NotificationType
-  channelId String?
-  unread    Boolean          @default(true)
-  createdAt DateTime         @default(now())
+  id             String           @id @default(uuid())
+  userId         String
+  title          String
+  body           String
+  type           NotificationType
+  channelId      String?
+  conversationId String?
+  messageId      String?
+  unread         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -193,4 +202,18 @@ model ReadReceipt {
 
   @@unique([messageId, userId])
   @@map("read_receipts")
+}
+
+model SavedMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  messageId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([userId])
+  @@map("saved_messages")
 }

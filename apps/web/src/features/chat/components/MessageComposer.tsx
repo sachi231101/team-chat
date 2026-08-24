@@ -22,7 +22,10 @@ import {
   FileText,
   ChevronDown,
 } from 'lucide-react';
-import { useChatDataStore } from '../../../stores';
+import { useUiStore } from '../../../stores';
+import { useWorkspace, useChatMutations } from '../../../hooks';
+import { socketService } from '../../../services';
+import { chatService } from '../../../services';
 import { Tooltip } from '../../../components/ui';
 import { MentionDropdown, MentionItem } from './MentionDropdown';
 
@@ -50,17 +53,24 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const {
-    activeId,
-    activeType,
-    channels,
-    conversations,
-    users,
-    currentUser,
-    sendMessage,
-    sendThreadReply,
-    sendTypingIndicator,
-  } = useChatDataStore();
+  const { activeId, activeType } = useUiStore();
+  const { channels, conversations, users, currentUser } = useWorkspace();
+  const { sendMessage } = useChatMutations();
+
+  const sendTypingIndicator = (isTyping: boolean) => {
+    if (isTyping) {
+      socketService.startTyping(
+        currentUser.name,
+        activeType === 'channel' ? activeId : undefined,
+        activeType === 'conversation' ? activeId : undefined,
+      );
+    } else {
+      socketService.stopTyping(
+        activeType === 'channel' ? activeId : undefined,
+        activeType === 'conversation' ? activeId : undefined,
+      );
+    }
+  };
 
   const currentChannel = channels.find((c) => c.id === activeId);
   const currentConversation = conversations.find((c) => c.id === activeId);
@@ -139,11 +149,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     sendTypingIndicator(false);
 
-    if (parentMessageId) {
-      sendThreadReply(parentMessageId, content);
-    } else {
-      sendMessage(content, attachedFiles);
-    }
+    sendMessage.mutate({
+      content,
+      attachments: attachedFiles,
+      parentMessageId,
+    });
 
     setContent('');
     setAttachedFiles([]);
@@ -337,11 +347,21 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               <Plus className="h-4 w-4" />,
               'Attach files',
               () => {
-                const mock = [
-                  { name: 'design-system-v2.png', url: '#', size: 1887437, type: 'image/png' },
-                  { name: 'q4-report.pdf', url: '#', size: 1048576, type: 'application/pdf' },
-                ];
-                setAttachedFiles((p) => [...p, mock[Math.floor(Math.random() * mock.length)]]);
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                input.onchange = async () => {
+                  const files = Array.from(input.files || []);
+                  for (const file of files) {
+                    try {
+                      const uploaded = await chatService.uploadAttachment(file);
+                      setAttachedFiles((p) => [...p, uploaded]);
+                    } catch {
+                      useUiStore.getState().setError('Failed to upload file');
+                    }
+                  }
+                };
+                input.click();
               },
             )}
             {fmtBtn(<Type className="h-4 w-4" />, 'Text formatting', () => {})}

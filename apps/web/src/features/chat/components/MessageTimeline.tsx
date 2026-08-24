@@ -1,15 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Hash, Lock, User as UserIcon, Sparkles, ChevronDown, ChevronUp, CheckCircle2, ArrowRight } from 'lucide-react';
-import { useChatDataStore } from '../../../stores';
+import React, { useEffect, useRef } from 'react';
+import { Hash, Lock, User as UserIcon } from 'lucide-react';
+import { useUiStore } from '../../../stores';
+import { useWorkspace, useActiveMessages, useChatMutations } from '../../../hooks';
 import { MessageItem } from './MessageItem';
 import { formatDateDivider } from '../../../utils';
 
 export const MessageTimeline: React.FC = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [catchupExpanded, setCatchupExpanded] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const lastReadCaptured = useRef<string | null>(null);
 
-  const { activeId, activeType, channels, conversations, users, currentUser, messages, typingUsers, messagesLoading } =
-    useChatDataStore();
+  const { activeId, activeType, typingUsers } = useUiStore();
+  const { channels, conversations, users, currentUser } = useWorkspace();
+  const { messages, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, lastReadMessageId } =
+    useActiveMessages();
+  const { markRead } = useChatMutations();
 
   const currentChannel = channels.find((c) => c.id === activeId);
   const currentConversation = conversations.find((c) => c.id === activeId);
@@ -24,23 +30,31 @@ export const MessageTimeline: React.FC = () => {
       : null;
 
   // Only non-reply messages for the active context
-  const currentMessages = messages.filter((m) => {
-    if (m.parentMessageId) return false;
-    if (activeType === 'channel') return m.channelId === activeId;
-    if (activeType === 'conversation') return m.conversationId === activeId;
-    return false;
-  });
+  const currentMessages = messages.filter((m) => !m.parentMessageId);
 
-  // Auto-scroll to bottom whenever messages change or active channel changes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+    lastReadCaptured.current = lastReadMessageId;
+  }, [activeId, lastReadMessageId]);
+
+  useEffect(() => {
+    if (stickToBottom.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+    }
   }, [activeId, currentMessages.length]);
 
-  // Determine where unread messages start (show divider before first unread)
-  const firstUnreadIndex = currentMessages.findIndex((m) => {
-    // Consider last 2 messages as "new" for demonstration purposes
-    const idx = currentMessages.indexOf(m);
-    return idx === Math.max(0, currentMessages.length - 2);
+  useEffect(() => {
+    const latest = currentMessages[currentMessages.length - 1];
+    if (!latest) return;
+    const t = setTimeout(() => {
+      markRead.mutate(latest.id);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [activeId, currentMessages[currentMessages.length - 1]?.id]);
+
+  const firstUnreadIndex = currentMessages.findIndex((m, idx) => {
+    if (!lastReadCaptured.current) return false;
+    const lastIdx = currentMessages.findIndex((msg) => msg.id === lastReadCaptured.current);
+    return lastIdx >= 0 && idx === lastIdx + 1;
   });
 
   // Group messages by calendar date
@@ -62,8 +76,16 @@ export const MessageTimeline: React.FC = () => {
 
   return (
     <div
+      ref={scrollerRef}
       className="flex-1 overflow-y-auto overflow-x-hidden"
       style={{ background: 'var(--color-main)' }}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        if (el.scrollTop < 80 && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      }}
     >
       {/* ── Channel / DM Welcome Banner ─────────────────── */}
       <div
@@ -118,53 +140,16 @@ export const MessageTimeline: React.FC = () => {
             </p>
           </div>
         ) : null}
-
-        {/* AI Daily Catchup Digest Banner for active channel */}
-        {activeType === 'channel' && currentChannel && currentMessages.length > 0 && (
-          <div className="mt-4 rounded-xl border border-violet-500/25 bg-gradient-to-r from-violet-950/30 via-slate-900/60 to-indigo-950/20 p-3 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500/20 text-violet-300">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-200">
-                    Catch-up on #{currentChannel.name}
-                  </span>
-                  <span className="ml-2 text-[10px] text-slate-400">
-                    {currentMessages.length} messages • AI Summary available
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setCatchupExpanded(!catchupExpanded)}
-                className="flex items-center gap-1 rounded-lg bg-white/5 hover:bg-white/10 px-2 py-1 text-[11px] font-semibold text-violet-300 transition-colors"
-              >
-                <span>{catchupExpanded ? 'Hide Digest' : 'View Digest'}</span>
-                {catchupExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </button>
-            </div>
-
-            {catchupExpanded && (
-              <div className="mt-2.5 pt-2.5 border-t border-white/5 space-y-1.5 text-xs animate-in fade-in">
-                <div className="flex items-start gap-2 text-[11px] text-slate-300">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>Key discussions focused on architecture specifications, design system tokens, and V1 milestones.</span>
-                </div>
-                <div className="flex items-start gap-2 text-[11px] text-slate-300">
-                  <ArrowRight className="h-3.5 w-3.5 text-sky-400 shrink-0 mt-0.5" />
-                  <span>{users.slice(0, 3).map((u) => u.name).join(', ')} contributed recent updates.</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Message Groups ───────────────────────────────── */}
       <div className="pb-4">
-        {messagesLoading ? (
+        {isFetchingNextPage && (
+          <div className="py-2 text-center text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+            Loading older messages…
+          </div>
+        )}
+        {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <div
               className="h-7 w-7 rounded-full border-2 border-t-transparent animate-spin"

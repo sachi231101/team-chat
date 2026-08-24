@@ -1,6 +1,7 @@
 import React from 'react';
 import { SquarePen, Search, Plus, ChevronDown } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { Avatar, Tooltip } from '../ui';
 import { ChannelList } from './ChannelList';
 import { DirectMessageList } from './DirectMessageList';
@@ -10,10 +11,10 @@ export const SidebarPanel: React.FC = () => {
     setSearchModalOpen,
     setCreateChannelModalOpen,
     setPeopleModalOpen,
-    currentUser,
-    setCurrentUserStatus,
     setProfileModalOpen,
-  } = useChatDataStore();
+  } = useUiStore();
+  const { currentUser } = useWorkspace();
+  const { updateStatus } = useChatMutations();
 
   return (
     <aside
@@ -130,9 +131,9 @@ export const SidebarPanel: React.FC = () => {
           </span>
           <button
             onClick={() =>
-              setCurrentUserStatus(
-                currentUser.status === 'online' ? 'away' : 'online',
-              )
+              updateStatus.mutate({
+                status: currentUser.status === 'online' ? 'away' : 'online',
+              })
             }
             className="flex items-center gap-1 text-left transition-colors"
             style={{ color: 'var(--color-online)' }}

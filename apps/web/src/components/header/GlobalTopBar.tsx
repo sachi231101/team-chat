@@ -1,10 +1,12 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu } from 'lucide-react';
+import { useUiStore } from '../../stores';
+import { useWorkspace } from '../../hooks';
 import { Avatar } from '../ui';
 
 export const GlobalTopBar: React.FC = () => {
-  const { setSearchModalOpen, setProfileModalOpen, currentUser, notifications } = useChatDataStore();
+  const { setSearchModalOpen, setProfileModalOpen, toggleSidebar } = useUiStore();
+  const { currentUser, notifications } = useWorkspace();
   const unread = notifications.filter((n) => n.unread).length;
 
   return (
@@ -14,6 +16,14 @@ export const GlobalTopBar: React.FC = () => {
     >
       {/* Left: back / forward / history */}
       <div className="flex items-center gap-0.5 shrink-0">
+        <button
+          className="flex h-7 w-7 items-center justify-center rounded-md md:hidden hover:bg-white/5"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onClick={toggleSidebar}
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
         <button
           className="flex h-7 w-7 items-center justify-center rounded-md opacity-30 cursor-not-allowed"
           style={{ color: 'var(--color-text-secondary)' }}

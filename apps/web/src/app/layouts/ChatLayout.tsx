@@ -6,7 +6,8 @@ import { MainChatArea } from '../../features/chat/components';
 import { ThreadPanel } from '../../features/threads/components';
 import { DetailsPanel } from '../../components/details';
 import { ErrorToast } from '../../components/common';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useChatSession } from '../../hooks';
 import {
   SearchModal,
   CreateChannelModal,
@@ -14,52 +15,52 @@ import {
   ProfileModal,
   SettingsModal,
   PeopleModal,
-  CreateTaskModal,
-  CreateApprovalModal,
 } from '../../components/modals';
 
 export const ChatLayout: React.FC = () => {
-  const initStore = useChatDataStore((s) => s.initStore);
+  useChatSession();
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const detailsPanelOpen = useUiStore((s) => s.detailsPanelOpen);
 
   useEffect(() => {
-    initStore();
-  }, [initStore]);
+    const apply = () => {
+      if (window.innerWidth < 768) {
+        useUiStore.setState({ sidebarOpen: false, detailsPanelOpen: false });
+      }
+    };
+    apply();
+  }, []);
 
   return (
     <div
       className="flex flex-col h-screen w-screen overflow-hidden antialiased"
       style={{ background: 'var(--color-main)', color: 'var(--color-text-primary)' }}
     >
-      {/* ── Row 1: Global Top Bar (full width) ── */}
       <GlobalTopBar />
 
-      {/* ── Row 2: Main body (icon rail + sidebar + chat) ── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Icon Rail */}
-        <IconRail />
+        <div className={sidebarOpen ? 'flex' : 'hidden md:flex'}>
+          <IconRail />
+        </div>
+        <div className={sidebarOpen ? 'flex' : 'hidden md:flex'}>
+          <SidebarPanel />
+        </div>
 
-        {/* Sidebar Panel */}
-        <SidebarPanel />
-
-        {/* Conversation + Optional Panels */}
         <div className="flex flex-1 overflow-hidden min-w-0">
           <MainChatArea />
           <ThreadPanel />
-          <DetailsPanel />
+          <div className={detailsPanelOpen ? 'hidden lg:flex' : 'hidden'}>
+            <DetailsPanel />
+          </div>
         </div>
       </div>
 
-      {/* ── Modals ── */}
       <SearchModal />
       <CreateChannelModal />
       <InviteModal />
       <ProfileModal />
       <SettingsModal />
       <PeopleModal />
-      <CreateTaskModal />
-      <CreateApprovalModal />
-
-      {/* ── Global Error Toast ── */}
       <ErrorToast />
     </div>
   );

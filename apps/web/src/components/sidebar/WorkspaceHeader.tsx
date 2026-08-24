@@ -1,10 +1,10 @@
 import React from 'react';
 import { MessageSquarePlus, ChevronDown, Sparkles } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
 import { Tooltip } from '../ui';
 
 export const WorkspaceHeader: React.FC = () => {
-  const { setCreateChannelModalOpen } = useChatDataStore();
+  const { setCreateChannelModalOpen } = useUiStore();
 
   return (
     <div className="flex h-14 items-center justify-between border-b border-slate-800/80 px-4">

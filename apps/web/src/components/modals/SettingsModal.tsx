@@ -1,6 +1,6 @@
 import React from 'react';
 import { Palette, Bell, Keyboard, Moon, Sun, Monitor } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
 import { Modal, Button } from '../ui';
 import { cn } from '../../lib/utils';
 
@@ -14,7 +14,7 @@ export const SettingsModal: React.FC = () => {
     setDensity,
     soundEnabled,
     setSoundEnabled,
-  } = useChatDataStore();
+  } = useUiStore();
 
   return (
     <Modal

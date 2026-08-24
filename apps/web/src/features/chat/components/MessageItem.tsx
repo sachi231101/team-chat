@@ -12,16 +12,15 @@ import {
   FileText,
   Check,
   Image as ImageIcon,
-  CheckSquare,
-  FileCheck2,
-  Lightbulb,
   Sparkles,
 } from 'lucide-react';
 import { Message } from '@team-chat/shared';
-import { useChatDataStore } from '../../../stores';
+import { useUiStore } from '../../../stores';
+import { useWorkspace, useActiveMessages, useChatMutations } from '../../../hooks';
 import { Avatar, Tooltip } from '../../../components/ui';
 import { formatTimestamp } from '../../../utils';
 import { cn } from '../../../lib/utils';
+import { resolveAssetUrl } from '../../../lib/assets';
 
 export interface MessageItemProps {
   message: Message;
@@ -37,21 +36,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
   const [editContent, setEditContent] = useState(message.content);
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const [decisionSaved, setDecisionSaved] = useState(false);
 
-  const {
-    currentUser,
-    toggleReaction,
-    togglePin,
-    toggleSaveMessage,
-    savedMessageIds,
-    deleteMessage,
-    editMessage,
-    openThread,
-    openCreateTaskModal,
-    openCreateApprovalModal,
-    saveAsDecision,
-  } = useChatDataStore();
+  const { currentUser } = useWorkspace();
+  const { savedMessageIds } = useWorkspace();
+  const { openThread } = useUiStore();
+  const { toggleReaction, togglePin, toggleSave, deleteMessage, editMessage } = useChatMutations();
 
   const isAuthor = message.senderId === currentUser.id;
   const isSaved = savedMessageIds.includes(message.id);
@@ -71,7 +60,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
 
   const handleSaveEdit = () => {
     if (editContent.trim() && editContent !== message.content) {
-      editMessage(message.id, editContent.trim());
+      editMessage.mutate({ id: message.id, content: editContent.trim() });
     }
     setIsEditing(false);
   };
@@ -256,7 +245,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                     }}
                   >
                     <img
-                      src={att.url}
+                      src={resolveAssetUrl(att.url)}
                       alt={att.name}
                       className="h-full w-full object-cover opacity-80 mix-blend-overlay"
                     />
@@ -274,7 +263,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                       </div>
                     </div>
                     <a
-                      href={att.url}
+                      href={resolveAssetUrl(att.url)}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded p-1.5 transition-colors hover:bg-white/10"
@@ -317,7 +306,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             {Object.entries(reactionGroups).map(([emoji, data]) => (
               <Tooltip key={emoji} content={`${data.users.join(', ')} reacted with ${emoji}`} side="top">
                 <button
-                  onClick={() => toggleReaction(message.id, emoji)}
+                  onClick={() => toggleReaction.mutate({ id: message.id, emoji })}
                   className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-all active:scale-95"
                   style={{
                     background: data.hasReacted ? 'var(--color-accent-muted)' : 'rgba(255,255,255,0.04)',
@@ -377,7 +366,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             {QUICK_EMOJIS.slice(0, 4).map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => toggleReaction(message.id, emoji)}
+                onClick={() => toggleReaction.mutate({ id: message.id, emoji })}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all hover:scale-110"
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
@@ -404,13 +393,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             {
               icon: <Pin className="h-3.5 w-3.5" />,
               label: message.pinned ? 'Unpin' : 'Pin message',
-              action: () => togglePin(message.id),
+              action: () => togglePin.mutate(message.id),
               active: message.pinned,
             },
             {
               icon: <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current")} />,
               label: isSaved ? 'Remove from saved' : 'Save for later',
-              action: () => toggleSaveMessage(message.id),
+              action: () => toggleSave.mutate(message.id),
               active: isSaved,
             },
             {
@@ -454,7 +443,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                 style={{ background: 'var(--color-modal)', border: '1px solid var(--color-border)' }}
               >
                 <button
-                  onClick={() => { toggleSaveMessage(message.id); setShowMoreActions(false); }}
+                  onClick={() => { toggleSave.mutate(message.id); setShowMoreActions(false); }}
                   className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
                   style={{ color: 'var(--color-text-secondary)' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
@@ -462,46 +451,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                 >
                   <Bookmark className={cn("h-3 w-3", isSaved && "fill-current text-violet-400")} />
                   <span>{isSaved ? 'Remove from saved' : 'Save message'}</span>
-                </button>
-
-                {/* Workflow Bridge Actions */}
-                <div className="my-1 border-t border-white/10" />
-
-                <button
-                  onClick={() => { openCreateTaskModal(message); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors text-indigo-300 hover:bg-indigo-600/20"
-                >
-                  <CheckSquare className="h-3 w-3 text-indigo-400" />
-                  <span>Create task</span>
-                </button>
-
-                <button
-                  onClick={() => { openCreateApprovalModal(message); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors text-sky-300 hover:bg-sky-600/20"
-                >
-                  <FileCheck2 className="h-3 w-3 text-sky-400" />
-                  <span>Request approval</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    saveAsDecision(message.id);
-                    setDecisionSaved(true);
-                    setTimeout(() => setDecisionSaved(false), 1500);
-                    setShowMoreActions(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors text-amber-300 hover:bg-amber-600/20"
-                >
-                  <Lightbulb className="h-3 w-3 text-amber-400" />
-                  <span>{decisionSaved ? 'Decision Logged!' : 'Save as decision'}</span>
-                </button>
-
-                <button
-                  onClick={() => { openThread(message.id); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors text-violet-300 hover:bg-violet-600/20"
-                >
-                  <Sparkles className="h-3 w-3 text-violet-400" />
-                  <span>Summarize thread</span>
                 </button>
 
                 <div className="my-1 border-t border-white/10" />
@@ -529,7 +478,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                       <span>Edit message</span>
                     </button>
                     <button
-                      onClick={() => { deleteMessage(message.id); setShowMoreActions(false); }}
+                      onClick={() => { deleteMessage.mutate(message.id); setShowMoreActions(false); }}
                       className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
                       style={{ color: 'var(--color-busy)' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'; }}
@@ -557,7 +506,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             {QUICK_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => { toggleReaction(message.id, emoji); setShowEmojiPicker(false); }}
+                onClick={() => { toggleReaction.mutate({ id: message.id, emoji }); setShowEmojiPicker(false); }}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110"
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}

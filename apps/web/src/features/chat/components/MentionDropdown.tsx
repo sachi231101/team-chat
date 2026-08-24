@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Volume2 } from 'lucide-react';
-import { useChatDataStore } from '../../../stores';
+import { useWorkspace } from '../../../hooks';
 import { chatService } from '../../../services';
 import { Avatar } from '../../../components/ui';
 import { User } from '@team-chat/shared';
@@ -32,7 +32,7 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
   const [channelMembers, setChannelMembers] = useState<User[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const { users, conversations } = useChatDataStore();
+  const { users, conversations } = useWorkspace();
 
   // Load channel members or conversation participants
   useEffect(() => {

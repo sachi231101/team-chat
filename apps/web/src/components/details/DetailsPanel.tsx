@@ -11,21 +11,14 @@ import {
   UserPlus,
   LogOut,
 } from 'lucide-react';
-import { useChatDataStore } from '../../stores';
+import { useUiStore } from '../../stores';
+import { useWorkspace, useActiveMessages } from '../../hooks';
 import { Avatar } from '../ui';
 
 export const DetailsPanel: React.FC = () => {
-  const {
-    activeId,
-    activeType,
-    channels,
-    conversations,
-    users,
-    currentUser,
-    messages,
-    detailsPanelOpen,
-    toggleDetailsPanel,
-  } = useChatDataStore();
+  const { activeId, activeType, detailsPanelOpen, toggleDetailsPanel } = useUiStore();
+  const { channels, conversations, users, currentUser } = useWorkspace();
+  const { messages } = useActiveMessages();
 
   if (!detailsPanelOpen) return null;
 
