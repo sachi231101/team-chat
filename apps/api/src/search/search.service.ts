@@ -1,0 +1,78 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+
+@Injectable()
+export class SearchService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async search(query: string, workplaceId: string = 'wp-teamchat-main') {
+    if (!query || !query.trim()) {
+      return { messages: [], channels: [], users: [] };
+    }
+    const q = query.trim();
+
+    try {
+      const [messages, channels, users] = await Promise.all([
+        this.prisma.message.findMany({
+          where: {
+            content: { contains: q, mode: 'insensitive' },
+            deletedAt: null,
+          },
+          include: { sender: true },
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.channel.findMany({
+          where: {
+            workplaceId,
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+          take: 20,
+        }),
+        this.prisma.user.findMany({
+          where: {
+            workplaceId,
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+          take: 20,
+        }),
+      ]);
+
+      return {
+        messages: messages.map((m) => ({
+          id: m.id,
+          content: m.content,
+          senderId: m.senderId,
+          senderName: m.sender.name,
+          senderAvatar: m.sender.avatarUrl ?? undefined,
+          channelId: m.channelId ?? undefined,
+          conversationId: m.conversationId ?? undefined,
+          createdAt: m.createdAt.toISOString(),
+        })),
+        channels: channels.map((c) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description ?? undefined,
+          type: c.type.toLowerCase(),
+        })),
+        users: users.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          avatarUrl: u.avatarUrl ?? undefined,
+          title: u.title ?? undefined,
+        })),
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Failed to search: ${(error as Error).message}`,
+      );
+    }
+  }
+}

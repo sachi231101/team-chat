@@ -1,0 +1,196 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+}
+
+enum UserStatus {
+  ONLINE
+  BUSY
+  AWAY
+  OFFLINE
+}
+
+enum NotificationType {
+  MENTION
+  REPLY
+  REACTION
+  DIRECT_MESSAGE
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  name          String
+  avatarUrl     String?
+  title         String?
+  status        UserStatus  @default(ONLINE)
+  statusMessage String?
+  workplaceId   String      @default("wp-teamchat-main")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  createdChannels        Channel[]                 @relation("ChannelCreator")
+  channelMemberships     ChannelMember[]
+  conversationMemberships ConversationParticipant[]
+  sentMessages           Message[]                 @relation("SentMessages")
+  reactions              MessageReaction[]
+  notifications          Notification[]
+  readReceipts           ReadReceipt[]
+
+  @@index([workplaceId])
+  @@map("users")
+}
+
+model Channel {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  topic       String?
+  type        ChannelType @default(PUBLIC)
+  workplaceId String      @default("wp-teamchat-main")
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  createdBy   User            @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members     ChannelMember[]
+  messages    Message[]
+
+  @@unique([workplaceId, name])
+  @@index([workplaceId])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@map("channel_members")
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  workplaceId String   @default("wp-teamchat-main")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([workplaceId])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id              String    @id @default(uuid())
+  content         String    @db.Text
+  senderId        String
+  channelId       String?
+  conversationId  String?
+  parentMessageId String?
+  pinned          Boolean   @default(false)
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sender        User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  channel       Channel?          @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversation  Conversation?     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parentMessage Message?          @relation("ThreadReplies", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  replies       Message[]         @relation("ThreadReplies")
+  reactions     MessageReaction[]
+  attachments   Attachment[]
+  readReceipts  ReadReceipt[]
+
+  @@index([channelId, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([parentMessageId])
+  @@map("messages")
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  messageId String
+  name      String
+  size      Int
+  type      String
+  url       String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      NotificationType
+  channelId String?
+  unread    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, unread])
+  @@map("notifications")
+}
+
+model ReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("read_receipts")
+}

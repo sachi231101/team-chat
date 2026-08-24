@@ -1,0 +1,28 @@
+{
+  "name": "team-chat-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Team Chat Platform monorepo",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "prisma:generate": "pnpm --filter api prisma:generate",
+    "prisma:migrate": "pnpm --filter api prisma:migrate"
+  },
+  "keywords": [
+    "team-chat",
+    "chat",
+    "monorepo",
+    "react",
+    "nestjs",
+    "prisma",
+    "socketio"
+  ],
+  "author": "",
+  "license": "ISC"
+}

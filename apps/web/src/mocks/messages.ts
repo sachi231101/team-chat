@@ -1,0 +1,117 @@
+import { Message } from '@team-chat/shared';
+
+export const MOCK_MESSAGES: Message[] = [
+  // #general
+  {
+    id: 'msg-gen-1',
+    channelId: 'chn-general',
+    senderId: 'usr-rahul',
+    senderName: 'Rahul Sharma',
+    senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    content: '🚀 Welcome everyone to **Team Chat V1**! We are building a high-performance, modular messaging application.\n\nLet’s ensure all discussions remain focused, clean, and collaborative.',
+    pinned: true,
+    reactions: [
+      { id: 'r1', emoji: '👍', userId: 'usr-priya', userName: 'Priya Patel', createdAt: '2026-01-04T09:05:00.000Z' },
+      { id: 'r2', emoji: '❤️', userId: 'usr-arjun', userName: 'Arjun Mehta', createdAt: '2026-01-04T09:06:00.000Z' },
+      { id: 'r3', emoji: '🎉', userId: 'usr-sachin', userName: 'Sachin Verma', createdAt: '2026-01-04T09:10:00.000Z' },
+      { id: 'r4', emoji: '🔥', userId: 'usr-ananya', userName: 'Ananya Iyer', createdAt: '2026-01-04T09:12:00.000Z' },
+    ],
+    replyCount: 3,
+    lastReplyAt: '2026-01-04T09:45:00.000Z',
+    createdAt: '2026-01-04T02:30:00.000Z',
+    updatedAt: '2026-01-04T02:30:00.000Z',
+  },
+  {
+    id: 'msg-gen-2',
+    channelId: 'chn-general',
+    senderId: 'usr-priya',
+    senderName: 'Priya Patel',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    content: 'Good morning team! ☀️ I’ve finalized the design tokens and dark mode palette. Here is the updated design spec preview for the message timeline & reactions bar.',
+    attachments: [
+      {
+        id: 'att-1',
+        name: 'design-system-v2.png',
+        size: 1024 * 1024 * 1.8,
+        type: 'image/png',
+        url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+        previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+        createdAt: '2026-01-04T02:45:00.000Z',
+      },
+    ],
+    reactions: [
+      { id: 'r5', emoji: '👍', userId: 'usr-rahul', userName: 'Rahul Sharma', createdAt: '2026-01-04T09:20:00.000Z' },
+      { id: 'r6', emoji: '👏', userId: 'usr-kavita', userName: 'Kavita Rao', createdAt: '2026-01-04T09:25:00.000Z' },
+    ],
+    replyCount: 0,
+    createdAt: '2026-01-04T02:45:00.000Z',
+    updatedAt: '2026-01-04T02:45:00.000Z',
+  },
+  {
+    id: 'msg-gen-3',
+    channelId: 'chn-general',
+    senderId: 'usr-arjun',
+    senderName: 'Arjun Mehta',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    content: 'Looks amazing! The gradients and shadows are on point. 🔥',
+    reactions: [
+      { id: 'r7', emoji: '🎉', userId: 'usr-rahul', userName: 'Rahul Sharma', createdAt: '2026-01-04T09:35:00.000Z' },
+    ],
+    replyCount: 0,
+    createdAt: '2026-01-04T03:10:00.000Z',
+    updatedAt: '2026-01-04T03:10:00.000Z',
+  },
+
+  // Thread replies for msg-gen-1
+  {
+    id: 'msg-thr-1',
+    channelId: 'chn-general',
+    parentMessageId: 'msg-gen-1',
+    senderId: 'usr-priya',
+    senderName: 'Priya Patel',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    content: 'Super thrilled for this milestone! The React + Tailwind frontend is coming together nicely.',
+    reactions: [
+      { id: 'r10', emoji: '🎉', userId: 'usr-rahul', userName: 'Rahul Sharma', createdAt: '2026-01-04T09:10:00.000Z' },
+    ],
+    createdAt: '2026-01-04T09:08:00.000Z',
+    updatedAt: '2026-01-04T09:08:00.000Z',
+  },
+  {
+    id: 'msg-thr-2',
+    channelId: 'chn-general',
+    parentMessageId: 'msg-gen-1',
+    senderId: 'usr-arjun',
+    senderName: 'Arjun Mehta',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    content: 'Backend modules for chat, presence, notifications, and realtime are in place.',
+    reactions: [],
+    createdAt: '2026-01-04T09:15:00.000Z',
+    updatedAt: '2026-01-04T09:15:00.000Z',
+  },
+  {
+    id: 'msg-thr-3',
+    channelId: 'chn-general',
+    parentMessageId: 'msg-gen-1',
+    senderId: 'usr-sachin',
+    senderName: 'Sachin Verma',
+    senderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    content: 'Awesome work everyone! Let’s keep pushing forward.',
+    reactions: [],
+    createdAt: '2026-01-04T09:20:00.000Z',
+    updatedAt: '2026-01-04T09:20:00.000Z',
+  },
+
+  // #engineering
+  {
+    id: 'msg-eng-1',
+    channelId: 'chn-engineering',
+    senderId: 'usr-arjun',
+    senderName: 'Arjun Mehta',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    content: 'Updated the API schemas for channel conversations. Please check packages/shared/src/types/chat.ts for the latest model signatures.',
+    reactions: [{ id: 'r11', emoji: '👍', userId: 'usr-sachin', userName: 'Sachin Verma', createdAt: '2026-01-04T10:00:00.000Z' }],
+    createdAt: '2026-01-04T09:50:00.000Z',
+    updatedAt: '2026-01-04T09:50:00.000Z',
+  },
+];
