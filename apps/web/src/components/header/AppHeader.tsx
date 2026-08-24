@@ -117,6 +117,11 @@ export const AppHeader: React.FC = () => {
               <div className="min-w-0">
                 <h2 className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
                   {otherUser.name}
+                  {otherUser.id === currentUser.id ? (
+                    <span className="ml-1.5 font-normal" style={{ color: 'var(--color-text-tertiary)' }}>
+                      you
+                    </span>
+                  ) : null}
                 </h2>
                 <p className="text-[11px] capitalize" style={{ color: 'var(--color-online)' }}>
                   {otherUser.status === 'online' ? 'Online' : otherUser.status}

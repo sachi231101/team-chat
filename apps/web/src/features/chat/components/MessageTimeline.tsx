@@ -133,10 +133,17 @@ export const MessageTimeline: React.FC = () => {
               className="text-2xl font-extrabold tracking-tight"
               style={{ color: 'var(--color-text-primary)' }}
             >
-              {otherUser.name}
+              {otherUser.id === currentUser.id ? `${otherUser.name} (you)` : otherUser.name}
             </h1>
             <p className="text-sm max-w-xl leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              This is the very beginning of your direct message history with <strong style={{ color: 'var(--color-text-primary)' }}>{otherUser.name}</strong>. Messages here are private between the two of you.
+              {otherUser.id === currentUser.id
+                ? 'This is your space for notes, drafts, and anything you want to keep handy. Only you can see these messages.'
+                : (
+                  <>
+                    This is the very beginning of your direct message history with{' '}
+                    <strong style={{ color: 'var(--color-text-primary)' }}>{otherUser.name}</strong>. Messages here are private between the two of you.
+                  </>
+                )}
             </p>
           </div>
         ) : null}

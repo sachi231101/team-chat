@@ -68,6 +68,9 @@ export class ConversationsService {
     const uniqueParticipants = Array.from(new Set(data.participants));
 
     try {
+      const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
+      if (existing) return existing;
+
       const c = await this.prisma.$transaction(async (tx) => {
         return tx.conversation.create({
           data: {
@@ -93,5 +96,35 @@ export class ConversationsService {
         `Failed to create conversation: ${(error as Error).message}`,
       );
     }
+  }
+
+  private async findMatchingConversation(
+    workplaceId: string,
+    participantIds: string[],
+  ): Promise<Conversation | null> {
+    const wanted = [...participantIds].sort();
+    const convos = await this.prisma.conversation.findMany({
+      where: {
+        workplaceId,
+        participants: { some: { userId: { in: wanted } } },
+      },
+      include: { participants: true },
+    });
+
+    const match = convos.find((c) => {
+      const ids = c.participants.map((p) => p.userId).sort();
+      return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
+    });
+
+    if (!match) return null;
+
+    return {
+      id: match.id,
+      participants: match.participants.map((p) => p.userId),
+      workplaceId: match.workplaceId,
+      unreadCount: 0,
+      createdAt: match.createdAt.toISOString(),
+      updatedAt: match.updatedAt.toISOString(),
+    };
   }
 }

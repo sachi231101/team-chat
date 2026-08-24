@@ -1,8 +1,7 @@
 import React from 'react';
-import { SquarePen, Search, Plus, ChevronDown } from 'lucide-react';
+import { SquarePen, Search, Plus, ChevronDown, MessagesSquare } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace, useChatMutations } from '../../hooks';
-import { Avatar, Tooltip } from '../ui';
+import { Tooltip } from '../ui';
 import { ChannelList } from './ChannelList';
 import { DirectMessageList } from './DirectMessageList';
 
@@ -11,10 +10,7 @@ export const SidebarPanel: React.FC = () => {
     setSearchModalOpen,
     setCreateChannelModalOpen,
     setPeopleModalOpen,
-    setProfileModalOpen,
   } = useUiStore();
-  const { currentUser } = useWorkspace();
-  const { updateStatus } = useChatMutations();
 
   return (
     <aside
@@ -89,10 +85,11 @@ export const SidebarPanel: React.FC = () => {
         <div className="px-2 pt-4">
           <div className="flex items-center justify-between px-2 mb-1">
             <span
-              className="text-[11px] font-bold uppercase tracking-wider"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              className="flex items-center gap-1.5 text-[13px] font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              Direct Messages
+              <MessagesSquare className="h-3.5 w-3.5 shrink-0" />
+              Direct messages
             </span>
             <Tooltip content="New direct message" side="right">
               <button
@@ -105,44 +102,6 @@ export const SidebarPanel: React.FC = () => {
             </Tooltip>
           </div>
           <DirectMessageList />
-        </div>
-      </div>
-
-      {/* ── Bottom: Current user ── */}
-      <div
-        className="flex items-center gap-2.5 px-3 py-2.5"
-        style={{ borderTop: '1px solid var(--color-border)' }}
-      >
-        <button
-          onClick={() => setProfileModalOpen(true)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg overflow-hidden"
-        >
-          <Avatar
-            name={currentUser.name}
-            src={currentUser.avatarUrl}
-            size="sm"
-            status={currentUser.status}
-            showStatus
-          />
-        </button>
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-            {currentUser.name}
-          </span>
-          <button
-            onClick={() =>
-              updateStatus.mutate({
-                status: currentUser.status === 'online' ? 'away' : 'online',
-              })
-            }
-            className="flex items-center gap-1 text-left transition-colors"
-            style={{ color: 'var(--color-online)' }}
-          >
-            <span className="text-[10px] font-medium capitalize">
-              {currentUser.status === 'online' ? 'Online' : currentUser.status}
-            </span>
-            <ChevronDown className="h-2.5 w-2.5" />
-          </button>
         </div>
       </div>
     </aside>

@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaClient, ChannelType, UserStatus, NotificationType, ChannelMemberRole } from '@prisma/client';
+import { provisionUserPublicChannels, DEFAULT_PUBLIC_CHANNELS } from './default-channels';
 
 @Injectable()
 export class PrismaService
@@ -20,6 +21,7 @@ export class PrismaService
       this.isConnected = true;
       this.logger.log('✅ PostgreSQL database connected successfully via Prisma');
       await this.seedInitialWorkspaceData();
+      await this.provisionMissingDefaultChannels();
     } catch (error) {
       this.isConnected = false;
       this.logger.warn(
@@ -155,6 +157,15 @@ export class PrismaService
           createdById: 'usr-rahul',
         },
         {
+          id: 'chn-random',
+          name: 'random',
+          description: 'Watercooler chat, intros, and off-topic conversation',
+          topic: 'Say hello',
+          type: ChannelType.PUBLIC,
+          workplaceId: 'wp-teamchat-main',
+          createdById: 'usr-rahul',
+        },
+        {
           id: 'chn-engineering',
           name: 'engineering',
           description: 'Technical architecture, code reviews, PRs, and system design discussions',
@@ -272,6 +283,32 @@ export class PrismaService
       this.logger.log('✨ Seeded workspace users, channels, conversations, messages, and notifications in PostgreSQL successfully');
     } catch (err) {
       this.logger.warn(`Seed notice: ${(err as Error).message}`);
+    }
+  }
+
+  /** If the workspace already has users but is missing #general / #random / #announcements, create them. */
+  private async provisionMissingDefaultChannels() {
+    try {
+      const workplaceId = 'wp-teamchat-main';
+      const users = await this.user.findMany({ where: { workplaceId }, orderBy: { createdAt: 'asc' } });
+      if (users.length === 0) return;
+
+      const missing: string[] = [];
+      for (const def of DEFAULT_PUBLIC_CHANNELS) {
+        const exists = await this.channel.findFirst({ where: { workplaceId, name: def.name } });
+        if (!exists) missing.push(def.name);
+      }
+      if (missing.length === 0) return;
+
+      this.logger.log(`🌱 Creating default channels (${missing.join(', ')}) for existing workspace users`);
+      for (const user of users) {
+        await provisionUserPublicChannels(this, user.id, workplaceId);
+      }
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7478/ingest/00f10b65-0a04-4e60-b5e9-07d47622c725',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d06bbf'},body:JSON.stringify({sessionId:'d06bbf',runId:'post-fix',hypothesisId:'A',location:'prisma.service.ts:provisionMissingDefaultChannels',message:'default channel provision failed',data:{error:(err as Error).message},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      this.logger.warn(`Default channel provision notice: ${(err as Error).message}`);
     }
   }
 }

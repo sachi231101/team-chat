@@ -220,6 +220,7 @@ export function useChatMutations() {
       mutationFn: chatService.createUser,
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.users });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.channels });
       },
     }),
     markNotificationAsRead: useMutation({

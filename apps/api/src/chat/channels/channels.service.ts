@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { Channel, User } from '@team-chat/shared';
-import { ChannelType, ChannelMemberRole } from '@prisma/client';
+import { ChannelType, ChannelMemberRole, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ChannelsService {
@@ -124,6 +124,12 @@ export class ChannelsService {
         membersCount: result.members.length,
       };
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(`Channel #${normalizedName} already exists`);
+      }
       throw new InternalServerErrorException(
         `Failed to create channel: ${(error as Error).message}`,
       );

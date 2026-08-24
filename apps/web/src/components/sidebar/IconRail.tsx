@@ -15,14 +15,16 @@ import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
 import { Tooltip } from '../ui';
 import { MoreMenuPopover } from './MoreMenuPopover';
+import { ProfileMenuPopover } from './ProfileMenuPopover';
 import { cn } from '../../lib/utils';
 
 export const IconRail: React.FC = () => {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileAnchor, setProfileAnchor] = useState<DOMRect | null>(null);
   const {
     activeRailTab,
     setActiveRailTab,
-    setProfileModalOpen,
     setPeopleModalOpen,
     setCreateChannelModalOpen,
     theme,
@@ -241,32 +243,41 @@ export const IconRail: React.FC = () => {
           </button>
         </Tooltip>
 
-        {/* User Profile Avatar with snooze badge */}
+        {/* User Profile Avatar */}
         <Tooltip content="Profile & Status" side="right">
           <button
-            onClick={() => setProfileModalOpen(true)}
-            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm transition-transform hover:scale-105"
-            style={{
-              background: 'var(--color-accent)',
+            onClick={(e) => {
+              setProfileAnchor(e.currentTarget.getBoundingClientRect());
+              setProfileMenuOpen((open) => !open);
+              setMoreMenuOpen(false);
             }}
+            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm transition-transform hover:scale-105"
+            style={{ background: 'var(--color-accent)' }}
           >
             {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'S'}
             <span
-              className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full ring-1 ring-[var(--color-rail)]"
+              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-1 ring-[var(--color-rail)]"
               style={{
-                background: 'var(--color-online)',
+                background:
+                  currentUser.status === 'away' || currentUser.status === 'offline'
+                    ? 'var(--color-away, #f59e0b)'
+                    : currentUser.status === 'busy'
+                      ? 'var(--color-busy, #f43f5e)'
+                      : 'var(--color-online)',
               }}
-            >
-              <span className="text-[6px] font-extrabold text-slate-900 leading-none">z</span>
-            </span>
+            />
           </button>
         </Tooltip>
       </div>
 
-      {/* More Menu Popover */}
       <MoreMenuPopover
         isOpen={moreMenuOpen}
         onClose={() => setMoreMenuOpen(false)}
+      />
+      <ProfileMenuPopover
+        isOpen={profileMenuOpen}
+        onClose={() => setProfileMenuOpen(false)}
+        anchorRect={profileAnchor}
       />
     </nav>
   );

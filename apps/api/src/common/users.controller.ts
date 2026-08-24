@@ -16,6 +16,7 @@ import { UpdatePresenceDto } from '../presence/dto/update-presence.dto';
 import { UserStatus as PrismaUserStatus } from '@prisma/client';
 import { isPrismaNotFound } from './prisma-errors';
 import { User, UserStatus } from '@team-chat/shared';
+import { provisionUserPublicChannels } from './default-channels';
 
 @Controller('users')
 export class UsersController {
@@ -89,6 +90,12 @@ export class UsersController {
           workplaceId: body.workplaceId || 'wp-teamchat-main',
         },
       });
+
+      await provisionUserPublicChannels(
+        this.prisma,
+        u.id,
+        u.workplaceId,
+      );
 
       return {
         id: u.id,

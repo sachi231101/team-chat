@@ -20,7 +20,6 @@ import {
   Send,
   X,
   FileText,
-  ChevronDown,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
 import { useWorkspace, useChatMutations } from '../../../hooks';
@@ -139,7 +138,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       : activeType === 'channel' && currentChannel
       ? `Message #${currentChannel.name}`
       : otherUser
-      ? `Message ${otherUser.name}`
+      ? otherUser.id === currentUser.id
+        ? 'Jot something down'
+        : `Message ${otherUser.name}`
       : 'Type a message...');
 
   const canSend = content.trim().length > 0 || attachedFiles.length > 0;
@@ -410,39 +411,22 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             })}
           </div>
 
-          {/* Right: Send button — violet gradient with dropdown split */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={handleSend}
-              className="flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-xs font-semibold text-white transition-all active:scale-95"
-              style={{
-                background: canSend
-                  ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
-                  : 'var(--color-elevated)',
-                color: canSend ? '#fff' : 'var(--color-text-tertiary)',
-                boxShadow: canSend ? '0 0 14px rgba(124,58,237,0.35)' : 'none',
-                borderRight: '1px solid rgba(255,255,255,0.1)',
-                cursor: canSend ? 'pointer' : 'default',
-              }}
-            >
-              <Send className="h-3.5 w-3.5" />
-              <span>Send</span>
-            </button>
-            <button
-              type="button"
-              className="flex h-full items-center justify-center rounded-r-lg px-1.5 transition-all"
-              style={{
-                background: canSend
-                  ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
-                  : 'var(--color-elevated)',
-                color: canSend ? '#fff' : 'var(--color-text-tertiary)',
-                boxShadow: canSend ? '0 0 14px rgba(124,58,237,0.35)' : 'none',
-              }}
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSend}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-all active:scale-95"
+            style={{
+              background: canSend
+                ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
+                : 'var(--color-elevated)',
+              color: canSend ? '#fff' : 'var(--color-text-tertiary)',
+              boxShadow: canSend ? '0 0 14px rgba(124,58,237,0.35)' : 'none',
+              cursor: canSend ? 'pointer' : 'default',
+            }}
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span>Send</span>
+          </button>
         </div>
       </div>
     </div>
