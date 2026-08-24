@@ -45,6 +45,10 @@ export function useChatSession() {
       if (!id) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.messages(type, id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+      if (message.parentMessageId) {
+        void queryClient.invalidateQueries({ queryKey: ['message-replies', message.parentMessageId] });
+        void queryClient.invalidateQueries({ queryKey: ['message', message.parentMessageId] });
+      }
     };
 
     const offCreated = socketService.onMessageCreated(patchMessage);

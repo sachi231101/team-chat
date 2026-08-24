@@ -8,16 +8,41 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', isLoading, disabled, children, ...props }, ref) => {
+  ({ className, variant = 'primary', size = 'md', isLoading, disabled, children, style, ...props }, ref) => {
     const baseStyles =
-      'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
+      'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
 
-    const variants = {
-      primary: 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-900/30 active:scale-[0.98]',
-      secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60 active:scale-[0.98]',
-      ghost: 'text-slate-300 hover:text-white hover:bg-slate-800/80 active:scale-[0.98]',
-      danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-900/30 active:scale-[0.98]',
-      outline: 'border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800/50',
+    const variantStyles: Record<NonNullable<ButtonProps['variant']>, React.CSSProperties> = {
+      primary: {
+        background: 'var(--color-accent)',
+        color: '#ffffff',
+      },
+      secondary: {
+        background: 'var(--color-input)',
+        color: 'var(--color-text-primary)',
+        border: '1px solid var(--color-border)',
+      },
+      ghost: {
+        background: 'transparent',
+        color: 'var(--color-text-secondary)',
+      },
+      danger: {
+        background: 'var(--color-danger)',
+        color: '#ffffff',
+      },
+      outline: {
+        background: 'transparent',
+        color: 'var(--color-text-secondary)',
+        border: '1px solid var(--color-border)',
+      },
+    };
+
+    const variantClasses = {
+      primary: 'shadow-md active:scale-[0.98] hover:opacity-90',
+      secondary: 'active:scale-[0.98] hover-surface',
+      ghost: 'active:scale-[0.98] hover-surface',
+      danger: 'shadow-md active:scale-[0.98] hover:opacity-90',
+      outline: 'active:scale-[0.98] hover-surface',
     };
 
     const sizes = {
@@ -25,14 +50,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       sm: 'text-xs px-2.5 py-1.5 gap-1.5',
       md: 'text-sm px-3.5 py-2 gap-2',
       lg: 'text-base px-4 py-2.5 gap-2.5',
-      icon: 'p-2 rounded-lg text-slate-400 hover:text-slate-200',
+      icon: 'p-2 rounded-lg',
     };
 
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
-        className={cn(baseStyles, variants[variant], sizes[size], className)}
+        className={cn(baseStyles, variantClasses[variant], sizes[size], className)}
+        style={{ ...variantStyles[variant], ...style }}
         {...props}
       >
         {isLoading && (

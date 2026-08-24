@@ -5,7 +5,7 @@ declare class AttachmentInputDto {
     url: string;
 }
 export declare class CreateMessageDto {
-    content: string;
+    content?: string;
     channelId?: string;
     conversationId?: string;
     parentMessageId?: string;

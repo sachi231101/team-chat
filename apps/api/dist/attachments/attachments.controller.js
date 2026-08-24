@@ -42,7 +42,7 @@ __decorate([
                 cb(null, `${(0, crypto_1.randomUUID)()}-${safeName}`);
             },
         }),
-        limits: { fileSize: 15 * 1024 * 1024 },
+        limits: { fileSize: 50 * 1024 * 1024 },
     })),
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),

@@ -4,6 +4,8 @@ import {
   InternalServerErrorException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma, Message as PrismaMessage, User, MessageReaction, Attachment } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
@@ -11,6 +13,7 @@ import { Message } from '@team-chat/shared';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { MentionsService } from '../mentions/mentions.service';
+import { AiOrchestratorService } from '../../ai/ai-orchestrator.service';
 
 type MessageWithRelations = PrismaMessage & {
   sender: User | null;
@@ -31,6 +34,8 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeService,
     private readonly mentions: MentionsService,
+    @Inject(forwardRef(() => AiOrchestratorService))
+    private readonly ai: AiOrchestratorService,
   ) {}
 
   async findAll(
@@ -133,11 +138,16 @@ export class MessagesService {
       );
     }
 
+    const trimmedContent = body.content?.trim() ?? '';
+    if (!trimmedContent && (!body.attachments || body.attachments.length === 0)) {
+      throw new BadRequestException('Message must include text or at least one attachment');
+    }
+
     try {
       const m = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
           data: {
-            content: body.content,
+            content: trimmedContent,
             senderId: userId,
             channelId: body.channelId,
             conversationId: body.conversationId,
@@ -185,6 +195,7 @@ export class MessagesService {
       const dto = this.mapMessageToDto(m);
       this.realtime.emitToChat(dto, 'message:created', dto);
       void this.mentions.notifyFromMessage(dto);
+      this.ai.onMessageCreated(dto);
       return dto;
     } catch (error) {
       if (error instanceof BadRequestException) throw error;

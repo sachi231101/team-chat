@@ -89,14 +89,23 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
       }
     }
 
-    // Filtered scoped members
-    const filteredMembers = channelMembers.filter((m) =>
-      m.name.toLowerCase().includes(cleanQuery) ||
-      m.email.toLowerCase().includes(cleanQuery) ||
-      (m.title && m.title.toLowerCase().includes(cleanQuery))
+    const filteredMembers = [...channelMembers];
+    users
+      .filter((u) => u.id.startsWith('usr-agent-'))
+      .forEach((agent) => {
+        if (!filteredMembers.some((m) => m.id === agent.id)) {
+          filteredMembers.push(agent);
+        }
+      });
+
+    const visible = filteredMembers.filter(
+      (m) =>
+        m.name.toLowerCase().includes(cleanQuery) ||
+        m.email.toLowerCase().includes(cleanQuery) ||
+        (m.title && m.title.toLowerCase().includes(cleanQuery)),
     );
 
-    filteredMembers.forEach((u) => {
+    visible.forEach((u) => {
       list.push({
         id: u.id,
         name: u.name,
@@ -108,7 +117,7 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
     });
 
     return list;
-  }, [query, channelId, channelMembers]);
+  }, [query, channelId, channelMembers, users]);
 
   // Reset selected index when query changes
   useEffect(() => {
@@ -152,9 +161,12 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
         backdropFilter: 'blur(16px)',
       }}
     >
-      <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between text-[10px] font-semibold tracking-wider uppercase text-slate-400">
+      <div
+        className="flex items-center justify-between border-b px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
+        style={{ borderColor: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)' }}
+      >
         <span>{channelId ? 'Channel Members' : 'Participants'}</span>
-        <span className="text-[9px] font-mono text-slate-400">↑↓ to navigate</span>
+        <span className="font-mono text-[9px]">↑↓ to navigate</span>
       </div>
 
       <div className="p-1 space-y-0.5">
@@ -170,7 +182,7 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
               className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors"
               style={{
                 background: isSelected ? 'var(--color-accent-muted)' : 'transparent',
-                color: isSelected ? '#ffffff' : 'var(--color-text-primary)',
+                color: isSelected ? 'var(--color-active-text)' : 'var(--color-text-primary)',
               }}
             >
               {item.isSpecial ? (
@@ -203,9 +215,14 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
                       All
                     </span>
                   )}
+                  {item.id.startsWith('usr-agent-') && (
+                    <span className="text-[9px] uppercase px-1 rounded bg-sky-500/20 text-sky-300 font-bold">
+                      AI
+                    </span>
+                  )}
                 </div>
                 {item.subtitle && (
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className="text-[10px] text-theme-tertiary truncate">
                     {item.subtitle}
                   </p>
                 )}

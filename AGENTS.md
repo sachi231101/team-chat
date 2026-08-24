@@ -20,8 +20,9 @@ Do NOT build:
 - HR
 - Finance
 - Tasks
-- AI agents
-- AI assistant
+- Full Workplace AI platform (autonomous multi-step agents, billing, cross-workspace knowledge bases)
+
+A bounded in-chat AI module is allowed: NVIDIA-backed teammates, composer assist, and ask-your-workspace search.
 
 Authentication and organization management will eventually be provided by the Workplace platform.
 
@@ -75,6 +76,7 @@ notifications/
 presence/
 search/
 realtime/
+ai/
 
 ## Team Chat features
 
@@ -99,6 +101,9 @@ The product will eventually support:
 - Presence
 - Typing indicators
 - Read receipts
+- In-chat AI teammates (mention/DM)
+- Composer AI assist
+- Ask AI over accessible message history
 
 ## Development rule
 

@@ -2,7 +2,31 @@ import React from 'react';
 import { Palette, Bell, Keyboard, Moon, Sun, Monitor } from 'lucide-react';
 import { useUiStore } from '../../stores';
 import { Modal, Button } from '../ui';
-import { cn } from '../../lib/utils';
+
+const sectionTitleStyle: React.CSSProperties = {
+  color: 'var(--color-text-primary)',
+};
+
+const sectionDescStyle: React.CSSProperties = {
+  color: 'var(--color-text-secondary)',
+};
+
+const optionCardStyle = (selected: boolean): React.CSSProperties => ({
+  background: selected ? 'var(--color-accent-muted)' : 'var(--color-input)',
+  border: selected ? '1px solid var(--color-active-border)' : '1px solid var(--color-border)',
+  color: selected ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
+});
+
+const panelStyle: React.CSSProperties = {
+  background: 'var(--color-input)',
+  border: '1px solid var(--color-border)',
+};
+
+const kbdStyle: React.CSSProperties = {
+  background: 'var(--color-elevated)',
+  color: 'var(--color-text-tertiary)',
+  border: '1px solid var(--color-border)',
+};
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -27,8 +51,8 @@ export const SettingsModal: React.FC = () => {
       <div className="mt-4 space-y-6">
         {/* Appearance */}
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider mb-2.5">
-            <Palette className="h-4 w-4 text-indigo-400" />
+          <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={sectionTitleStyle}>
+            <Palette className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
             <span>Theme & Colors</span>
           </div>
 
@@ -45,16 +69,19 @@ export const SettingsModal: React.FC = () => {
                   key={t.id}
                   type="button"
                   onClick={() => setTheme(t.id as 'dark' | 'slate' | 'light')}
-                  className={cn(
-                    'flex flex-col items-start p-3 rounded-xl border transition-all text-left',
-                    isSelected
-                      ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-md shadow-indigo-950'
-                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700',
-                  )}
+                  className="flex flex-col items-start rounded-xl p-3 text-left transition-all"
+                  style={optionCardStyle(isSelected)}
                 >
-                  <Icon className={cn('h-5 w-5 mb-1.5', isSelected ? 'text-indigo-400' : 'text-slate-500')} />
-                  <span className="text-xs font-semibold text-white">{t.label}</span>
-                  <span className="text-[10px] text-slate-400 mt-0.5">{t.desc}</span>
+                  <Icon
+                    className="mb-1.5 h-5 w-5"
+                    style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+                  />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    {t.label}
+                  </span>
+                  <span className="mt-0.5 text-[10px]" style={sectionDescStyle}>
+                    {t.desc}
+                  </span>
                 </button>
               );
             })}
@@ -63,97 +90,84 @@ export const SettingsModal: React.FC = () => {
 
         {/* Message Density */}
         <div>
-          <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={sectionTitleStyle}>
             Message Display Density
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setDensity('comfortable')}
-              className={cn(
-                'flex flex-col p-3 rounded-xl border transition-all text-left',
-                density === 'comfortable'
-                  ? 'border-indigo-500 bg-indigo-950/40 text-white'
-                  : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700',
-              )}
-            >
-              <span className="text-xs font-semibold text-white">Comfortable</span>
-              <span className="text-[11px] text-slate-400 mt-0.5">
-                Spacious layout with rich avatars & timeline gaps
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setDensity('compact')}
-              className={cn(
-                'flex flex-col p-3 rounded-xl border transition-all text-left',
-                density === 'compact'
-                  ? 'border-indigo-500 bg-indigo-950/40 text-white'
-                  : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700',
-              )}
-            >
-              <span className="text-xs font-semibold text-white">Compact</span>
-              <span className="text-[11px] text-slate-400 mt-0.5">
-                Condensed row heights for maximum chat density
-              </span>
-            </button>
+            {(['comfortable', 'compact'] as const).map((option) => {
+              const isSelected = density === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setDensity(option)}
+                  className="flex flex-col rounded-xl p-3 text-left transition-all"
+                  style={optionCardStyle(isSelected)}
+                >
+                  <span className="text-xs font-semibold capitalize" style={{ color: 'var(--color-text-primary)' }}>
+                    {option}
+                  </span>
+                  <span className="mt-0.5 text-[11px]" style={sectionDescStyle}>
+                    {option === 'comfortable'
+                      ? 'Spacious layout with rich avatars & timeline gaps'
+                      : 'Condensed row heights for maximum chat density'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Notifications & Sound */}
-        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
+        <div className="flex items-center justify-between rounded-xl p-3.5" style={panelStyle}>
           <div className="flex items-center gap-3">
-            <Bell className="h-5 w-5 text-indigo-400" />
+            <Bell className="h-5 w-5" style={{ color: 'var(--color-accent)' }} />
             <div>
-              <p className="text-xs font-semibold text-white">Notification Sounds</p>
-              <p className="text-[11px] text-slate-400">Play audio ping for incoming mentions and direct messages</p>
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                Notification Sounds
+              </p>
+              <p className="text-[11px]" style={sectionDescStyle}>
+                Play audio ping for incoming mentions and direct messages
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={cn(
-              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-              soundEnabled ? 'bg-indigo-600' : 'bg-slate-700',
-            )}
+            className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+            style={{ background: soundEnabled ? 'var(--color-accent)' : 'var(--color-border)' }}
           >
             <span
-              className={cn(
-                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                soundEnabled ? 'translate-x-5' : 'translate-x-0',
-              )}
+              className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+              style={{ transform: soundEnabled ? 'translateX(1.25rem)' : 'translateX(0)' }}
             />
           </button>
         </div>
 
         {/* Keyboard shortcuts guide */}
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider mb-2.5">
-            <Keyboard className="h-4 w-4 text-indigo-400" />
+          <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={sectionTitleStyle}>
+            <Keyboard className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
             <span>Keyboard Shortcuts</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
-            <div className="flex justify-between rounded-lg bg-slate-900/80 p-2 border border-slate-800">
-              <span>Quick Search</span>
-              <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">Ctrl K</kbd>
-            </div>
-            <div className="flex justify-between rounded-lg bg-slate-900/80 p-2 border border-slate-800">
-              <span>Send message</span>
-              <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
-            </div>
-            <div className="flex justify-between rounded-lg bg-slate-900/80 p-2 border border-slate-800">
-              <span>New line</span>
-              <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">Shift Enter</kbd>
-            </div>
-            <div className="flex justify-between rounded-lg bg-slate-900/80 p-2 border border-slate-800">
-              <span>Close modal / Thread</span>
-              <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
-            </div>
+          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            {[
+              ['Quick Search', 'Ctrl K'],
+              ['Send message', 'Enter'],
+              ['New line', 'Shift Enter'],
+              ['Close modal / Thread', 'Esc'],
+            ].map(([label, key]) => (
+              <div key={label} className="flex justify-between rounded-lg p-2" style={panelStyle}>
+                <span style={{ color: 'var(--color-text-primary)' }}>{label}</span>
+                <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px]" style={kbdStyle}>
+                  {key}
+                </kbd>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-slate-800">
+        <div className="flex justify-end border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
           <Button variant="primary" onClick={() => setSettingsModalOpen(false)}>
             Done
           </Button>

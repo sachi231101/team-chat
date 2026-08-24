@@ -69,7 +69,7 @@ export const ActivityView: React.FC = () => {
             className="rounded-md px-3 py-1 text-xs font-semibold capitalize transition-all"
             style={{
               background: filter === tab ? 'var(--color-accent-muted)' : 'transparent',
-              color: filter === tab ? '#ffffff' : 'var(--color-text-secondary)',
+              color: filter === tab ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
               border: filter === tab ? '1px solid var(--color-active-border)' : '1px solid transparent',
             }}
           >

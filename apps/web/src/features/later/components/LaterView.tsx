@@ -46,7 +46,7 @@ export const LaterView: React.FC = () => {
           className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-all"
           style={{
             background: activeTab === 'pinned' ? 'var(--color-accent-muted)' : 'transparent',
-            color: activeTab === 'pinned' ? '#ffffff' : 'var(--color-text-secondary)',
+            color: activeTab === 'pinned' ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
             border: activeTab === 'pinned' ? '1px solid var(--color-active-border)' : '1px solid transparent',
           }}
         >
@@ -58,7 +58,7 @@ export const LaterView: React.FC = () => {
           className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-all"
           style={{
             background: activeTab === 'saved' ? 'var(--color-accent-muted)' : 'transparent',
-            color: activeTab === 'saved' ? '#ffffff' : 'var(--color-text-secondary)',
+            color: activeTab === 'saved' ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
             border: activeTab === 'saved' ? '1px solid var(--color-active-border)' : '1px solid transparent',
           }}
         >

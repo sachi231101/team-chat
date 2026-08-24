@@ -126,6 +126,16 @@ export class PrismaService
           statusMessage: 'Monitoring system health 🛡️',
           workplaceId: 'wp-teamchat-main',
         },
+        {
+          id: 'usr-agent-workspace',
+          name: 'WorkspaceAgent',
+          email: 'workspace.agent@teamchat.ai',
+          avatarUrl: 'https://images.unsplash.com/photo-1639322537228-f710d846310a?w=150&auto=format&fit=crop&q=80',
+          title: 'Personal workspace assistant',
+          status: UserStatus.ONLINE,
+          statusMessage: 'Catch-up, search, and drafts — DM only',
+          workplaceId: 'wp-teamchat-main',
+        },
       ];
 
       for (const u of usersData) {

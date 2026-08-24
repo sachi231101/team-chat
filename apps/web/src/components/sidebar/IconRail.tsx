@@ -10,6 +10,7 @@ import {
   Plus,
   Moon,
   Sun,
+  Monitor,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
@@ -25,10 +26,10 @@ export const IconRail: React.FC = () => {
   const {
     activeRailTab,
     setActiveRailTab,
-    setPeopleModalOpen,
+    setInviteModalOpen,
     setCreateChannelModalOpen,
     theme,
-    setTheme,
+    toggleTheme,
   } = useUiStore();
   const { currentUser, notifications } = useWorkspace();
 
@@ -91,9 +92,38 @@ export const IconRail: React.FC = () => {
     },
   ];
 
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+  const railActionBtnStyle = {
+    background: 'var(--color-rail-button-bg)',
+    color: 'var(--color-text-secondary)',
+  } as const;
+
+  const onRailActionEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'var(--color-rail-button-hover)';
+    e.currentTarget.style.color = 'var(--color-text-primary)';
   };
+
+  const onRailActionLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'var(--color-rail-button-bg)';
+    e.currentTarget.style.color = 'var(--color-text-secondary)';
+  };
+
+  const themeToggle = {
+    dark: {
+      icon: <Moon className="h-3.5 w-3.5" />,
+      label: 'Dark mode — click for Slate Navy',
+      next: 'Slate Navy',
+    },
+    slate: {
+      icon: <Monitor className="h-3.5 w-3.5" />,
+      label: 'Slate Navy — click for Light',
+      next: 'Light',
+    },
+    light: {
+      icon: <Sun className="h-3.5 w-3.5" />,
+      label: 'Light mode — click for Dark',
+      next: 'Dark',
+    },
+  }[theme];
 
   return (
     <nav
@@ -136,7 +166,7 @@ export const IconRail: React.FC = () => {
                 )}
                 style={{
                   background: isActive ? 'var(--color-active-bg)' : 'transparent',
-                  color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+                  color: isActive ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -164,7 +194,7 @@ export const IconRail: React.FC = () => {
               <span
                 className="mt-0.5 text-[9px] font-medium tracking-tight transition-colors leading-none"
                 style={{
-                  color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+                  color: isActive ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
                   fontWeight: isActive ? 600 : 500,
                 }}
               >
@@ -180,20 +210,11 @@ export const IconRail: React.FC = () => {
         {/* Invite / People button */}
         <Tooltip content="Invite teammates" side="right">
           <button
-            onClick={() => setPeopleModalOpen(true)}
+            onClick={() => setInviteModalOpen(true)}
             className="flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105"
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: 'var(--color-text-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.08)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-            }}
+            style={railActionBtnStyle}
+            onMouseEnter={onRailActionEnter}
+            onMouseLeave={onRailActionLeave}
           >
             <UserPlus className="h-3.5 w-3.5" />
           </button>
@@ -204,42 +225,25 @@ export const IconRail: React.FC = () => {
           <button
             onClick={() => setCreateChannelModalOpen(true)}
             className="flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105"
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: 'var(--color-text-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.08)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-            }}
+            style={railActionBtnStyle}
+            onMouseEnter={onRailActionEnter}
+            onMouseLeave={onRailActionLeave}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
         </Tooltip>
 
         {/* Theme toggle */}
-        <Tooltip content={theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'} side="right">
+        <Tooltip content={`${themeToggle.label}`} side="right">
           <button
             onClick={toggleTheme}
             className="flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105"
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: 'var(--color-text-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.08)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-            }}
+            style={railActionBtnStyle}
+            onMouseEnter={onRailActionEnter}
+            onMouseLeave={onRailActionLeave}
+            aria-label={`Current theme: ${theme}. Switch to ${themeToggle.next}.`}
           >
-            {theme === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            {themeToggle.icon}
           </button>
         </Tooltip>
 

@@ -8,20 +8,26 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessagesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
 const realtime_service_1 = require("../../realtime/realtime.service");
 const mentions_service_1 = require("../mentions/mentions.service");
+const ai_orchestrator_service_1 = require("../../ai/ai-orchestrator.service");
 let MessagesService = class MessagesService {
     prisma;
     realtime;
     mentions;
-    constructor(prisma, realtime, mentions) {
+    ai;
+    constructor(prisma, realtime, mentions, ai) {
         this.prisma = prisma;
         this.realtime = realtime;
         this.mentions = mentions;
+        this.ai = ai;
     }
     async findAll(userId, channelId, conversationId, limit = 50, cursor) {
         if (!channelId && !conversationId) {
@@ -106,11 +112,15 @@ let MessagesService = class MessagesService {
         if (hasChannel === hasConversation) {
             throw new common_1.BadRequestException('Provide exactly one of channelId or conversationId');
         }
+        const trimmedContent = body.content?.trim() ?? '';
+        if (!trimmedContent && (!body.attachments || body.attachments.length === 0)) {
+            throw new common_1.BadRequestException('Message must include text or at least one attachment');
+        }
         try {
             const m = await this.prisma.$transaction(async (tx) => {
                 const created = await tx.message.create({
                     data: {
-                        content: body.content,
+                        content: trimmedContent,
                         senderId: userId,
                         channelId: body.channelId,
                         conversationId: body.conversationId,
@@ -153,6 +163,7 @@ let MessagesService = class MessagesService {
             const dto = this.mapMessageToDto(m);
             this.realtime.emitToChat(dto, 'message:created', dto);
             void this.mentions.notifyFromMessage(dto);
+            this.ai.onMessageCreated(dto);
             return dto;
         }
         catch (error) {
@@ -435,8 +446,10 @@ let MessagesService = class MessagesService {
 exports.MessagesService = MessagesService;
 exports.MessagesService = MessagesService = __decorate([
     (0, common_1.Injectable)(),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => ai_orchestrator_service_1.AiOrchestratorService))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         realtime_service_1.RealtimeService,
-        mentions_service_1.MentionsService])
+        mentions_service_1.MentionsService,
+        ai_orchestrator_service_1.AiOrchestratorService])
 ], MessagesService);
 //# sourceMappingURL=messages.service.js.map

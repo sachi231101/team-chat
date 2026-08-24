@@ -4,6 +4,7 @@ import { Message } from '@team-chat/shared';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { MentionsService } from '../mentions/mentions.service';
+import { AiOrchestratorService } from '../../ai/ai-orchestrator.service';
 type MessageWithRelations = PrismaMessage & {
     sender: User | null;
     reactions: (MessageReaction & {
@@ -21,7 +22,8 @@ export declare class MessagesService {
     private readonly prisma;
     private readonly realtime;
     private readonly mentions;
-    constructor(prisma: PrismaService, realtime: RealtimeService, mentions: MentionsService);
+    private readonly ai;
+    constructor(prisma: PrismaService, realtime: RealtimeService, mentions: MentionsService, ai: AiOrchestratorService);
     findAll(userId: string, channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<MessageListResult>;
     findOne(id: string): Promise<Message>;
     create(userId: string, body: CreateMessageDto): Promise<Message>;

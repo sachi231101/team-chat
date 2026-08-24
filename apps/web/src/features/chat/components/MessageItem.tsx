@@ -19,8 +19,9 @@ import { useUiStore } from '../../../stores';
 import { useWorkspace, useActiveMessages, useChatMutations } from '../../../hooks';
 import { Avatar, Tooltip } from '../../../components/ui';
 import { formatTimestamp } from '../../../utils';
-import { cn } from '../../../lib/utils';
 import { resolveAssetUrl } from '../../../lib/assets';
+import { renderChatMarkdown } from '../lib/renderChatMarkdown';
+import { cn } from '../../../lib/utils';
 
 export interface MessageItemProps {
   message: Message;
@@ -37,10 +38,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  const { currentUser } = useWorkspace();
+  const { currentUser, conversations } = useWorkspace();
   const { savedMessageIds } = useWorkspace();
-  const { openThread } = useUiStore();
-  const { toggleReaction, togglePin, toggleSave, deleteMessage, editMessage } = useChatMutations();
+  const { openThread, setActiveConversation, focusMessageId } = useUiStore();
+  const { toggleReaction, togglePin, toggleSave, deleteMessage, editMessage, createConversation } = useChatMutations();
 
   const isAuthor = message.senderId === currentUser.id;
   const isSaved = savedMessageIds.includes(message.id);
@@ -72,79 +73,74 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
     setShowMoreActions(false);
   };
 
-  // Render markdown-like formatting
-  const renderContent = (content: string) => {
-    if (content.includes('```')) {
-      const parts = content.split('```');
-      return parts.map((part, idx) => {
-        if (idx % 2 === 1) {
-          const lines = part.trim().split('\n');
-          const lang = lines[0];
-          const code = lines.slice(1).join('\n') || lines[0];
-          return (
-            <pre
-              key={idx}
-              className="my-2 overflow-x-auto rounded-lg p-3 font-mono text-xs leading-relaxed"
-              style={{
-                background: 'var(--color-code-bg)',
-                border: '1px solid var(--color-code-border)',
-                color: '#7dd3fc',
-              }}
-            >
-              {lang && <div className="mb-1 text-[10px] font-semibold" style={{ color: 'var(--color-text-tertiary)' }}>{lang}</div>}
-              <code>{code}</code>
-            </pre>
-          );
-        }
-        return <span key={idx} className="whitespace-pre-wrap">{renderInline(part)}</span>;
-      });
-    }
-    return <span className="whitespace-pre-wrap">{renderInline(content)}</span>;
-  };
+  const openSenderChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const senderId = message.senderId;
+    if (!senderId) return;
 
-  const renderInline = (text: string) => {
-    // Bold **text**, inline `code`
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
-    return parts.map((chunk, i) => {
-      if (chunk.startsWith('**') && chunk.endsWith('**'))
-        return <strong key={i} className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>{chunk.slice(2, -2)}</strong>;
-      if (chunk.startsWith('`') && chunk.endsWith('`'))
-        return (
-          <code
-            key={i}
-            className="rounded px-1 py-0.5 font-mono text-[11px]"
-            style={{ background: 'var(--color-code-bg)', color: '#7dd3fc', border: '1px solid var(--color-code-border)' }}
-          >
-            {chunk.slice(1, -1)}
-          </code>
-        );
-      return chunk;
+    const existing = conversations.find((c) => {
+      const unique = Array.from(new Set(c.participants));
+      if (senderId === currentUser.id) {
+        return unique.length === 1 && unique[0] === currentUser.id;
+      }
+      return (
+        unique.length === 2 &&
+        unique.includes(currentUser.id) &&
+        unique.includes(senderId)
+      );
     });
+
+    if (existing) {
+      setActiveConversation(existing.id);
+      return;
+    }
+    createConversation.mutate(senderId);
   };
 
   return (
     <div
+      id={`msg-${message.id}`}
+      data-message-id={message.id}
       className="group relative flex gap-3 px-4 py-1.5 transition-colors"
-      style={{ background: hovered ? 'rgba(255,255,255,0.025)' : 'transparent' }}
+      style={{
+        background: hovered
+          ? 'rgba(255,255,255,0.025)'
+          : focusMessageId === message.id
+            ? 'var(--color-accent-muted)'
+            : 'transparent',
+        outline: focusMessageId === message.id ? '1px solid var(--color-active-border)' : undefined,
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* ── Avatar ─────────────────────────────────────────── */}
-      <div className="mt-0.5 shrink-0">
+      <button
+        type="button"
+        onClick={openSenderChat}
+        className="mt-0.5 shrink-0 rounded-lg transition-opacity hover:opacity-80"
+        title={`Message ${message.senderName}`}
+      >
         <Avatar
           name={message.senderName}
           src={message.senderAvatar}
           size={isThreadReply ? 'sm' : 'md'}
         />
-      </div>
+      </button>
 
       {/* ── Body ───────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
         {/* Header: name + timestamp + badges */}
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+          <button
+            type="button"
+            onClick={openSenderChat}
+            className="text-sm font-bold hover:underline"
+            style={{ color: 'var(--color-text-primary)' }}
+            title={`Message ${message.senderName}`}
+          >
             {message.senderName}
-          </span>
+          </button>
           {isAiBot && (
             <span className="flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
               <Sparkles className="h-2.5 w-2.5" />
@@ -220,7 +216,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             className="mt-0.5 text-sm leading-relaxed"
             style={{ color: 'var(--color-text-secondary)' }}
           >
-            {renderContent(message.content)}
+            {renderChatMarkdown(message.content)}
           </div>
         )}
 
@@ -228,8 +224,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.attachments.map((att) => {
+              const assetUrl = resolveAssetUrl(att.url);
               const isImg = att.type.startsWith('image/');
-              return isImg ? (
+              const isVideo = att.type.startsWith('video/');
+              const isAudio = att.type.startsWith('audio/');
+
+              if (isImg) {
+                return (
                 <div
                   key={att.id}
                   className="group/img relative overflow-hidden rounded-xl w-full max-w-md transition-all"
@@ -238,16 +239,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                     border: '1px solid var(--color-border)',
                   }}
                 >
-                  <div
-                    className="h-32 w-full flex items-center justify-center relative overflow-hidden"
-                    style={{
-                      background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%)',
-                    }}
-                  >
+                  <div className="relative max-h-80 w-full overflow-hidden">
                     <img
-                      src={resolveAssetUrl(att.url)}
+                      src={assetUrl}
                       alt={att.name}
-                      className="h-full w-full object-cover opacity-80 mix-blend-overlay"
+                      className="max-h-80 w-full object-contain"
                     />
                   </div>
                   <div className="flex items-center justify-between p-2.5">
@@ -263,7 +259,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                       </div>
                     </div>
                     <a
-                      href={resolveAssetUrl(att.url)}
+                      href={assetUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded p-1.5 transition-colors hover:bg-white/10"
@@ -273,7 +269,45 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                     </a>
                   </div>
                 </div>
-              ) : (
+                );
+              }
+
+              if (isVideo) {
+                return (
+                  <div
+                    key={att.id}
+                    className="w-full max-w-md overflow-hidden rounded-xl"
+                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
+                  >
+                    <video src={assetUrl} controls className="max-h-80 w-full bg-black" />
+                    <div className="flex items-center justify-between p-2.5">
+                      <span className="truncate text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        {att.name}
+                      </span>
+                      <a href={assetUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-text-tertiary)' }}>
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isAudio) {
+                return (
+                  <div
+                    key={att.id}
+                    className="w-full max-w-md rounded-xl p-3"
+                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
+                  >
+                    <p className="mb-2 truncate text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      {att.name}
+                    </p>
+                    <audio src={assetUrl} controls className="w-full" />
+                  </div>
+                );
+              }
+
+              return (
                 <div
                   key={att.id}
                   className="flex items-center gap-2.5 rounded-xl p-2.5 transition-colors"
@@ -291,9 +325,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                       {(att.size / 1024).toFixed(0)} KB
                     </span>
                   </div>
-                  <button className="ml-2 rounded p-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <a
+                    href={assetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 rounded p-1"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                  >
                     <Download className="h-3.5 w-3.5" />
-                  </button>
+                  </a>
                 </div>
               );
             })}

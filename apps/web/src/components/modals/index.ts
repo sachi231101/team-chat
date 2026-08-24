@@ -4,3 +4,4 @@ export * from './InviteModal';
 export * from './ProfileModal';
 export * from './SettingsModal';
 export * from './PeopleModal';
+export * from './HuddleNotesModal';

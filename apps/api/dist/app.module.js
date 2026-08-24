@@ -20,6 +20,7 @@ const notifications_module_1 = require("./notifications/notifications.module");
 const presence_module_1 = require("./presence/presence.module");
 const search_module_1 = require("./search/search.module");
 const realtime_module_1 = require("./realtime/realtime.module");
+const ai_module_1 = require("./ai/ai.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -43,6 +44,7 @@ exports.AppModule = AppModule = __decorate([
             presence_module_1.PresenceModule,
             search_module_1.SearchModule,
             realtime_module_1.RealtimeModule,
+            ai_module_1.AiModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

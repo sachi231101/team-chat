@@ -12,12 +12,13 @@ const messages_controller_1 = require("./messages.controller");
 const messages_service_1 = require("./messages.service");
 const mentions_module_1 = require("../mentions/mentions.module");
 const realtime_module_1 = require("../../realtime/realtime.module");
+const ai_module_1 = require("../../ai/ai.module");
 let MessagesModule = class MessagesModule {
 };
 exports.MessagesModule = MessagesModule;
 exports.MessagesModule = MessagesModule = __decorate([
     (0, common_1.Module)({
-        imports: [mentions_module_1.MentionsModule, realtime_module_1.RealtimeModule],
+        imports: [mentions_module_1.MentionsModule, realtime_module_1.RealtimeModule, (0, common_1.forwardRef)(() => ai_module_1.AiModule)],
         controllers: [messages_controller_1.MessagesController],
         providers: [messages_service_1.MessagesService],
         exports: [messages_service_1.MessagesService],

@@ -18,7 +18,6 @@ export const PeopleModal: React.FC = () => {
   );
 
   const handleStartDM = (userId: string) => {
-    // Find or create conversation ID
     const existing = conversations.find(
       (c) => c.participants.includes(userId) && c.participants.includes(currentUser.id),
     );
@@ -46,24 +45,31 @@ export const PeopleModal: React.FC = () => {
           icon={<Search className="h-4 w-4" />}
         />
 
-        <div className="max-h-80 overflow-y-auto divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/40">
-          {filtered.map((u) => {
+        <div className="panel-surface max-h-80 overflow-y-auto rounded-xl">
+          {filtered.map((u, index) => {
             const isMe = u.id === currentUser.id;
             return (
               <div
                 key={u.id}
-                className="flex items-center justify-between p-3 hover:bg-slate-800/50 transition-colors"
+                className="flex items-center justify-between p-3 transition-colors hover-surface"
+                style={{
+                  borderBottom:
+                    index < filtered.length - 1 ? '1px solid var(--color-border)' : undefined,
+                }}
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
                   <Avatar name={u.name} src={u.avatarUrl} size="md" status={u.status} showStatus />
-                  <div className="flex flex-col min-w-0">
+                  <div className="flex min-w-0 flex-col">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-white truncate">{u.name}</span>
+                      <span className="truncate text-xs font-semibold text-theme-primary">{u.name}</span>
                       {isMe && <Badge variant="primary" size="sm">You</Badge>}
                     </div>
-                    <span className="text-[11px] text-slate-400 truncate">{u.title}</span>
+                    <span className="truncate text-[11px] text-theme-secondary">{u.title}</span>
                     {u.statusMessage && (
-                      <span className="text-[10px] text-indigo-300 italic truncate mt-0.5">
+                      <span
+                        className="mt-0.5 truncate text-[10px] italic"
+                        style={{ color: 'var(--color-accent)' }}
+                      >
                         &ldquo;{u.statusMessage}&rdquo;
                       </span>
                     )}
@@ -84,7 +90,12 @@ export const PeopleModal: React.FC = () => {
                   )}
                   <a
                     href={`mailto:${u.email}`}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-white"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover-surface"
+                    style={{
+                      border: '1px solid var(--color-border)',
+                      background: 'var(--color-input)',
+                      color: 'var(--color-text-secondary)',
+                    }}
                   >
                     <Mail className="h-3 w-3" />
                   </a>

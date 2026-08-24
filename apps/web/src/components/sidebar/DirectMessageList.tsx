@@ -13,7 +13,7 @@ function isSelfConversation(convo: Conversation, currentUserId: string) {
 function dmRowStyle(isActive: boolean, hasUnread: boolean): React.CSSProperties {
   return {
     background: isActive ? 'var(--color-active-bg)' : 'transparent',
-    color: isActive ? '#fff' : hasUnread ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+    color: isActive ? 'var(--color-active-text)' : hasUnread ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
     fontWeight: hasUnread || isActive ? 600 : 400,
   };
 }

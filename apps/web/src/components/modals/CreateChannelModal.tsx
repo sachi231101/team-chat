@@ -34,6 +34,12 @@ export const CreateChannelModal: React.FC = () => {
     setType('public');
   };
 
+  const visibilityCardClass = (selected: boolean) =>
+    cn(
+      'flex flex-col rounded-xl border p-3 text-left transition-all',
+      selected ? 'option-card-selected' : 'option-card hover-surface',
+    );
+
   return (
     <Modal
       isOpen={createChannelModalOpen}
@@ -43,9 +49,7 @@ export const CreateChannelModal: React.FC = () => {
     >
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Name
-          </label>
+          <label className="form-label mb-1.5 block text-xs font-semibold">Name</label>
           <Input
             value={name}
             onChange={handleNameChange}
@@ -57,8 +61,8 @@ export const CreateChannelModal: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Topic <span className="text-slate-500 font-normal">(optional)</span>
+          <label className="form-label mb-1.5 block text-xs font-semibold">
+            Topic <span className="form-label-muted font-normal">(optional)</span>
           </label>
           <Input
             value={topic}
@@ -69,37 +73,31 @@ export const CreateChannelModal: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Description <span className="text-slate-500 font-normal">(optional)</span>
+          <label className="form-label mb-1.5 block text-xs font-semibold">
+            Description <span className="form-label-muted font-normal">(optional)</span>
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Provide details about what should be discussed here"
             rows={2}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+            className="form-textarea w-full rounded-lg px-3.5 py-2 text-xs"
           />
         </div>
 
-        {/* Channel Visibility Type */}
         <div className="space-y-2 pt-1">
-          <label className="block text-xs font-semibold text-slate-300">Visibility</label>
+          <label className="form-label block text-xs font-semibold">Visibility</label>
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => setType('public')}
-              className={cn(
-                'flex flex-col text-left p-3 rounded-xl border transition-all',
-                type === 'public'
-                  ? 'border-indigo-500 bg-indigo-950/30 text-white'
-                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700',
-              )}
+              className={visibilityCardClass(type === 'public')}
             >
-              <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
-                <Hash className="h-3.5 w-3.5 text-indigo-400" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-theme-primary">
+                <Hash className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
                 <span>Public</span>
               </div>
-              <span className="text-[11px] text-slate-400 mt-1">
+              <span className="mt-1 text-[11px] text-theme-secondary">
                 Anyone in workspace can view & join
               </span>
             </button>
@@ -107,26 +105,20 @@ export const CreateChannelModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setType('private')}
-              className={cn(
-                'flex flex-col text-left p-3 rounded-xl border transition-all',
-                type === 'private'
-                  ? 'border-indigo-500 bg-indigo-950/30 text-white'
-                  : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700',
-              )}
+              className={visibilityCardClass(type === 'private')}
             >
-              <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
-                <Lock className="h-3.5 w-3.5 text-amber-400" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-theme-primary">
+                <Lock className="h-3.5 w-3.5" style={{ color: 'var(--color-pin)' }} />
                 <span>Private</span>
               </div>
-              <span className="text-[11px] text-slate-400 mt-1">
+              <span className="mt-1 text-[11px] text-theme-secondary">
                 Only invited members can view & join
               </span>
             </button>
           </div>
         </div>
 
-        {/* Modal Actions */}
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-800">
+        <div className="flex justify-end gap-2.5 border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
           <Button
             type="button"
             variant="secondary"

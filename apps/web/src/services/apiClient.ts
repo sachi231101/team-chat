@@ -69,6 +69,7 @@ function getFriendlyErrorMessage(status: number, detail: string): string {
     case 409: return `Conflict: ${detail}`;
     case 422: return `Validation error: ${detail}`;
     case 429: return 'Too many requests. Please slow down.';
+    case 503: return detail || 'AI is unavailable. Check AI_API_KEY.';
     case 500: return 'Something went wrong on the server. Please try again.';
     default:  return detail || `Request failed (${status})`;
   }

@@ -9,6 +9,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
+import { useChatMutations } from '../../hooks';
 
 export interface MoreMenuPopoverProps {
   isOpen: boolean;
@@ -16,7 +17,8 @@ export interface MoreMenuPopoverProps {
 }
 
 export const MoreMenuPopover: React.FC<MoreMenuPopoverProps> = ({ isOpen, onClose }) => {
-  const { setSettingsModalOpen, setSearchModalOpen } = useUiStore();
+  const { setSettingsModalOpen, setSearchModalOpen, setHuddleNotesModalOpen } = useUiStore();
+  const { createConversation } = useChatMutations();
 
   if (!isOpen) return null;
 
@@ -34,17 +36,28 @@ export const MoreMenuPopover: React.FC<MoreMenuPopoverProps> = ({ isOpen, onClos
         },
         {
           icon: <Headphones className="h-4 w-4 text-emerald-400" />,
-          title: 'Huddles',
-          subtitle: 'Start an audio/video team huddle',
+          title: 'Huddle notes',
+          subtitle: 'Turn a transcript or thread into action items',
           action: () => {
+            setHuddleNotesModalOpen(true);
             onClose();
           },
         },
         {
           icon: <Bot className="h-4 w-4 text-sky-400" />,
-          title: 'Slackbot',
-          subtitle: 'Your personal AI assistant and reminders',
+          title: 'WorkspaceAgent',
+          subtitle: 'Personal catch-up, search, and drafts (DM only)',
           action: () => {
+            createConversation.mutate('usr-agent-workspace');
+            onClose();
+          },
+        },
+        {
+          icon: <Bot className="h-4 w-4 text-sky-400" />,
+          title: 'ResearchAgent',
+          subtitle: 'Ask questions with citations from workspace chat',
+          action: () => {
+            createConversation.mutate('usr-agent-research');
             onClose();
           },
         },

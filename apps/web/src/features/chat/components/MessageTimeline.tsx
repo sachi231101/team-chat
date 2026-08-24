@@ -11,7 +11,7 @@ export const MessageTimeline: React.FC = () => {
   const stickToBottom = useRef(true);
   const lastReadCaptured = useRef<string | null>(null);
 
-  const { activeId, activeType, typingUsers } = useUiStore();
+  const { activeId, activeType, typingUsers, focusMessageId, setFocusMessageId } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
   const { messages, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, lastReadMessageId } =
     useActiveMessages();
@@ -37,10 +37,21 @@ export const MessageTimeline: React.FC = () => {
   }, [activeId, lastReadMessageId]);
 
   useEffect(() => {
+    if (focusMessageId) return;
     if (stickToBottom.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'instant' });
     }
-  }, [activeId, currentMessages.length]);
+  }, [activeId, currentMessages.length, focusMessageId]);
+
+  useEffect(() => {
+    if (!focusMessageId) return;
+    const el = document.getElementById(`msg-${focusMessageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const t = setTimeout(() => setFocusMessageId(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [focusMessageId, currentMessages.length, setFocusMessageId]);
 
   useEffect(() => {
     const latest = currentMessages[currentMessages.length - 1];
@@ -223,13 +234,20 @@ export const MessageTimeline: React.FC = () => {
         {/* Live typing indicator */}
         {typingUsers.length > 0 && (
           <div className="flex items-center gap-2 px-6 py-1.5 animate-in fade-in">
-            <div className="flex items-center gap-1 bg-white/5 px-2.5 py-1 rounded-full border border-white/5 text-[11px] text-slate-400">
+            <div
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px]"
+              style={{
+                background: 'var(--color-input)',
+                border: '1px solid var(--color-border-subtle)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
               <span className="flex items-center gap-0.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
-              <span className="font-medium text-slate-300">
+              <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 {typingUsers.map((u) => u.userName).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
               </span>
             </div>

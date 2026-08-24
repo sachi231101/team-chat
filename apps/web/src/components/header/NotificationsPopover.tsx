@@ -47,7 +47,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ isOp
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={markAllNotificationsAsRead.mutate}
+                onClick={() => markAllNotificationsAsRead.mutate()}
                 className="text-xs text-slate-400 hover:text-slate-200 gap-1"
               >
                 <CheckCheck className="h-3.5 w-3.5" />

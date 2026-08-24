@@ -13,7 +13,8 @@ describe('MessagesService', () => {
   };
   const realtime = { emitToChat: jest.fn() };
   const mentions = { notifyFromMessage: jest.fn() };
-  const service = new MessagesService(prisma as never, realtime as never, mentions as never);
+  const ai = { onMessageCreated: jest.fn() };
+  const service = new MessagesService(prisma as never, realtime as never, mentions as never, ai as never);
 
   it('rejects create when both channel and conversation are set', async () => {
     await expect(

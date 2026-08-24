@@ -8,6 +8,7 @@ import { DetailsPanel } from '../../components/details';
 import { ErrorToast } from '../../components/common';
 import { useUiStore } from '../../stores';
 import { useChatSession } from '../../hooks';
+import { useChatNavigation } from '../../hooks/useChatNavigation';
 import {
   SearchModal,
   CreateChannelModal,
@@ -15,10 +16,14 @@ import {
   ProfileModal,
   SettingsModal,
   PeopleModal,
+  HuddleNotesModal,
 } from '../../components/modals';
 
 export const ChatLayout: React.FC = () => {
   useChatSession();
+  useChatNavigation();
+  const huddleNotesModalOpen = useUiStore((s) => s.huddleNotesModalOpen);
+  const setHuddleNotesModalOpen = useUiStore((s) => s.setHuddleNotesModalOpen);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const detailsPanelOpen = useUiStore((s) => s.detailsPanelOpen);
 
@@ -61,6 +66,10 @@ export const ChatLayout: React.FC = () => {
       <ProfileModal />
       <SettingsModal />
       <PeopleModal />
+      <HuddleNotesModal
+        isOpen={huddleNotesModalOpen}
+        onClose={() => setHuddleNotesModalOpen(false)}
+      />
       <ErrorToast />
     </div>
   );

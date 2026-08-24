@@ -6,29 +6,58 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   size?: 'sm' | 'md';
 }
 
+const variantStyles: Record<NonNullable<BadgeProps['variant']>, React.CSSProperties> = {
+  default: {
+    background: 'var(--color-input)',
+    color: 'var(--color-text-secondary)',
+    border: '1px solid var(--color-border)',
+  },
+  primary: {
+    background: 'var(--color-accent-muted)',
+    color: 'var(--color-accent)',
+    border: '1px solid var(--color-active-border)',
+  },
+  success: {
+    background: 'rgba(34,197,94,0.12)',
+    color: '#16a34a',
+    border: '1px solid rgba(34,197,94,0.3)',
+  },
+  warning: {
+    background: 'rgba(245,158,11,0.12)',
+    color: 'var(--color-away)',
+    border: '1px solid rgba(245,158,11,0.3)',
+  },
+  danger: {
+    background: 'var(--color-danger-muted)',
+    color: 'var(--color-danger)',
+    border: '1px solid rgba(239,68,68,0.3)',
+  },
+  purple: {
+    background: 'var(--color-accent-muted)',
+    color: 'var(--color-accent)',
+    border: '1px solid var(--color-active-border)',
+  },
+};
+
 export const Badge: React.FC<BadgeProps> = ({
   className,
   variant = 'default',
   size = 'md',
   children,
+  style,
   ...props
 }) => {
-  const variants = {
-    default: 'bg-slate-800 text-slate-300 border border-slate-700/60',
-    primary: 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/50',
-    success: 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/50',
-    warning: 'bg-amber-950/80 text-amber-300 border border-amber-700/50',
-    danger: 'bg-rose-950/80 text-rose-300 border border-rose-700/50',
-    purple: 'bg-purple-950/80 text-purple-300 border border-purple-700/50',
-  };
-
   const sizes = {
     sm: 'text-[10px] px-1.5 py-0.5 font-medium rounded',
     md: 'text-xs px-2 py-0.5 font-medium rounded-md',
   };
 
   return (
-    <span className={cn('inline-flex items-center gap-1 font-semibold', variants[variant], sizes[size], className)} {...props}>
+    <span
+      className={cn('inline-flex items-center gap-1 font-semibold', sizes[size], className)}
+      style={{ ...variantStyles[variant], ...style }}
+      {...props}
+    >
       {children}
     </span>
   );

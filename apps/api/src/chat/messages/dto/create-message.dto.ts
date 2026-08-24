@@ -1,12 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AttachmentInputDto {
   @IsString()
   name: string;
 
+  @IsNumber()
+  @Type(() => Number)
   size: number;
-
   @IsString()
   type: string;
 
@@ -16,8 +17,8 @@ class AttachmentInputDto {
 
 export class CreateMessageDto {
   @IsString()
-  @IsNotEmpty()
-  content: string;
+  @IsOptional()
+  content?: string;
 
   @IsString()
   @IsOptional()

@@ -23,6 +23,11 @@ __decorate([
     __metadata("design:type", String)
 ], AttachmentInputDto.prototype, "name", void 0);
 __decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Number)
+], AttachmentInputDto.prototype, "size", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], AttachmentInputDto.prototype, "type", void 0);
@@ -40,7 +45,7 @@ class CreateMessageDto {
 exports.CreateMessageDto = CreateMessageDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateMessageDto.prototype, "content", void 0);
 __decorate([

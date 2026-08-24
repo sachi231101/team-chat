@@ -75,6 +75,7 @@ export const chatService = {
     const qs = params.toString() ? `?${params.toString()}` : '';
     return apiClient<Message[]>(`/messages/pinned${qs}`);
   },
+  getMessage: (id: string) => apiClient<Message>(`/messages/${id}`),
   sendMessage: (data: {
     content: string;
     channelId?: string;
@@ -134,6 +135,89 @@ export const chatService = {
   search: (query: string) =>
     apiClient<{ messages: Message[]; channels: Channel[]; users: User[] }>(`/search?q=${encodeURIComponent(query)}`),
 
+  getAiStatus: () =>
+    apiClient<{ enabled: boolean; provider: string; model: string; configured: boolean }>('/ai/status'),
+  composeWithAi: (data: {
+    action: 'improve' | 'shorten' | 'expand' | 'translate' | 'summarize' | 'casual' | 'exec';
+    text: string;
+    channelId?: string;
+    conversationId?: string;
+    parentMessageId?: string;
+  }) =>
+    apiClient<{ text: string }>('/ai/compose', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  askAi: (data: { question: string; channelId?: string; conversationId?: string }) =>
+    apiClient<{
+      answer: string;
+      citations: {
+        index: number;
+        messageId: string;
+        senderName: string;
+        content: string;
+        channelId?: string;
+        conversationId?: string;
+        createdAt: string;
+      }[];
+    }>('/ai/ask', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  summarizeWithAi: (data: {
+    window: 'unread' | '24h' | '7d';
+    channelId?: string;
+    conversationId?: string;
+    parentMessageId?: string;
+    postAsMessage?: boolean;
+    pin?: boolean;
+  }) =>
+    apiClient<{
+      summary: string;
+      postedMessageId?: string;
+      citations: {
+        index: number;
+        messageId: string;
+        senderName: string;
+        content: string;
+        channelId?: string;
+        conversationId?: string;
+        createdAt: string;
+      }[];
+    }>('/ai/summarize', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  recapWithAi: () =>
+    apiClient<{
+      recap: string;
+      citations: {
+        index: number;
+        messageId: string;
+        senderName: string;
+        content: string;
+        channelId?: string;
+        conversationId?: string;
+        createdAt: string;
+      }[];
+    }>('/ai/recap', { method: 'POST' }),
+  meetingNotesWithAi: (data: {
+    channelId?: string;
+    conversationId?: string;
+    parentMessageId?: string;
+    transcript?: string;
+    postAsMessage?: boolean;
+  }) =>
+    apiClient<{ notes: string; postedMessageId?: string }>('/ai/meeting-notes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  summarizeFileWithAi: (data: { name: string; url?: string; type?: string }) =>
+    apiClient<{ summary: string }>('/ai/summarize-file', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   uploadAttachment: async (file: File) => {
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const form = new FormData();
@@ -147,7 +231,15 @@ export const chatService = {
       body: form,
     });
     if (!response.ok) {
-      throw new Error('Failed to upload file');
+      let message = 'Failed to upload file';
+      try {
+        const body = await response.json();
+        message = body?.message ?? body?.error ?? message;
+        if (Array.isArray(message)) message = message.join(', ');
+      } catch {
+        if (response.status === 413) message = 'File is too large (max 50 MB)';
+      }
+      throw new Error(message);
     }
     return response.json() as Promise<{ name: string; size: number; type: string; url: string }>;
   },

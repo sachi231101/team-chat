@@ -51,20 +51,34 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl shadow-black/80 transition-all animate-in zoom-in-95',
+          'relative w-full overflow-hidden rounded-2xl p-6 shadow-2xl transition-all animate-in zoom-in-95',
           maxWidthMap[maxWidth],
         )}
+        style={{
+          background: 'var(--color-modal)',
+          border: '1px solid var(--color-border)',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        }}
       >
         <div className="flex items-start justify-between pb-4">
           <div>
-            {title && <h3 className="text-lg font-semibold text-white tracking-tight">{title}</h3>}
-            {description && <p className="mt-1 text-xs text-slate-400">{description}</p>}
+            {title && (
+              <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
+                {title}
+              </h3>
+            )}
+            {description && (
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                {description}
+              </p>
+            )}
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="-mr-2 -mt-2 text-slate-400 hover:text-white"
+            className="-mr-2 -mt-2"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             <X className="h-4 w-4" />
           </Button>

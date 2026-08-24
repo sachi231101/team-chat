@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Message, User } from '@team-chat/shared';
+import { Message, User, Channel } from '@team-chat/shared';
 import { chatService } from '../services';
 import { queryKeys } from '../lib/queryKeys';
 import { DEFAULT_CURRENT_USER, getStoredUserId, setStoredUserId } from '../lib/currentUser';
@@ -47,6 +48,21 @@ export function usePinnedMessagesQuery() {
   });
 }
 
+export function useContextPinnedMessagesQuery() {
+  const activeId = useUiStore((s) => s.activeId);
+  const activeType = useUiStore((s) => s.activeType);
+
+  return useQuery({
+    queryKey: queryKeys.pinned(activeType, activeId),
+    queryFn: () =>
+      chatService.getPinnedMessages(
+        activeType === 'channel' ? activeId : undefined,
+        activeType === 'conversation' ? activeId : undefined,
+      ),
+    enabled: Boolean(activeId),
+  });
+}
+
 export function useSavedMessagesQuery() {
   return useQuery({
     queryKey: queryKeys.savedMessages,
@@ -60,8 +76,10 @@ export function useWorkspace() {
   const conversationsQuery = useConversationsQuery();
   const notificationsQuery = useNotificationsQuery();
   const savedIdsQuery = useSavedIdsQuery();
+  const pruneStarredChannels = useUiStore((s) => s.pruneStarredChannels);
 
   const users = usersQuery.data ?? [];
+  const channels = channelsQuery.data ?? [];
   const storedId = getStoredUserId();
   const currentUser =
     users.find((u) => u.id === storedId) ||
@@ -69,9 +87,14 @@ export function useWorkspace() {
     users[0] ||
     DEFAULT_CURRENT_USER;
 
+  useEffect(() => {
+    if (channels.length === 0) return;
+    pruneStarredChannels(channels.map((c) => c.id));
+  }, [channels, pruneStarredChannels]);
+
   return {
     users,
-    channels: channelsQuery.data ?? [],
+    channels,
     conversations: conversationsQuery.data ?? [],
     notifications: notificationsQuery.data ?? [],
     savedMessageIds: savedIdsQuery.data ?? [],
@@ -164,6 +187,7 @@ export function useChatMutations() {
       onSuccess: () => {
         invalidateMessages();
         void queryClient.invalidateQueries({ queryKey: queryKeys.pinned('all', 'workspace') });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.pinned(activeType, activeId) });
       },
       onError: (err: Error) => setError(err.message),
     }),
@@ -242,6 +266,22 @@ export function useChatMutations() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.channels });
         void queryClient.invalidateQueries({ queryKey: queryKeys.users });
       },
+    }),
+    leaveChannel: useMutation({
+      mutationFn: (channelId: string) =>
+        chatService.removeChannelMember(channelId, getStoredUserId()),
+      onSuccess: (_result, channelId) => {
+        const remaining = (queryClient.getQueryData<Channel[]>(queryKeys.channels) ?? []).filter(
+          (c) => c.id !== channelId,
+        );
+        void queryClient.invalidateQueries({ queryKey: queryKeys.channels });
+        if (remaining.length > 0) {
+          setActiveChannel(remaining[0].id);
+        } else {
+          useUiStore.setState({ activeId: '', chatHeaderTab: 'messages' });
+        }
+      },
+      onError: (err: Error) => setError(err.message),
     }),
     switchUser: (user: User) => {
       setStoredUserId(user.id);

@@ -3,9 +3,6 @@ import {
   Hash,
   Lock,
   Star,
-  Phone,
-  Video,
-  Info,
   MoreHorizontal,
   PanelRight,
 } from 'lucide-react';
@@ -13,23 +10,26 @@ import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
 import { Avatar, Tooltip } from '../ui';
 import { NotificationsPopover } from './NotificationsPopover';
-
-type Tab = 'messages' | 'files' | 'pinned';
+import { SummarizeMenu } from './SummarizeMenu';
 
 export const AppHeader: React.FC = () => {
-  const [starred, setStarred] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('messages');
   const [notifOpen, setNotifOpen] = useState(false);
 
   const {
     activeId,
     activeType,
+    chatHeaderTab,
+    setChatHeaderTab,
     toggleDetailsPanel,
     detailsPanelOpen,
-  } = useUiStore();
-  const { channels, conversations, users, currentUser } = useWorkspace();
+    starredChannelIds,
+    toggleStarChannel,
+  } = useUiStore();  const { channels, conversations, users, currentUser } = useWorkspace();
 
   const currentChannel = channels.find((c) => c.id === activeId);
+  const isStarred = activeType === 'channel' && currentChannel
+    ? starredChannelIds.includes(currentChannel.id)
+    : false;
   const currentConversation = conversations.find((c) => c.id === activeId);
   const otherUser =
     activeType === 'conversation' && currentConversation
@@ -42,10 +42,11 @@ export const AppHeader: React.FC = () => {
       : null;
 
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: { id: typeof chatHeaderTab; label: string }[] = [
     { id: 'messages', label: 'Messages' },
     { id: 'files', label: 'Files' },
     { id: 'pinned', label: 'Pinned' },
+    { id: 'links', label: 'Links' },
   ];
 
   const iconBtn = (icon: React.ReactNode, label: string, onClick?: () => void, active?: boolean) => (
@@ -55,7 +56,7 @@ export const AppHeader: React.FC = () => {
         className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
         style={{
           background: active ? 'var(--color-active-bg)' : 'transparent',
-          color: active ? '#fff' : 'var(--color-text-secondary)',
+          color: active ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
         }}
         onMouseEnter={(e) => {
           if (!active) {
@@ -84,13 +85,19 @@ export const AppHeader: React.FC = () => {
       <div className="flex h-[49px] items-center justify-between px-4 gap-2">
         {/* Left: star + name + subtitle */}
         <div className="flex items-center gap-2 min-w-0">
-          <button
-            onClick={() => setStarred(!starred)}
-            className="shrink-0 transition-colors"
-            style={{ color: starred ? 'var(--color-pin)' : 'var(--color-text-tertiary)' }}
-          >
-            <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
-          </button>
+          {activeType === 'channel' && currentChannel ? (
+            <button
+              type="button"
+              onClick={() => toggleStarChannel(currentChannel.id)}
+              className="shrink-0 transition-colors"
+              style={{ color: isStarred ? 'var(--color-pin)' : 'var(--color-text-tertiary)' }}
+              title={isStarred ? 'Unstar channel' : 'Star channel'}
+            >
+              <Star className={`h-4 w-4 ${isStarred ? 'fill-current' : ''}`} />
+            </button>
+          ) : (
+            <span className="w-4" />
+          )}
 
           {activeType === 'channel' && currentChannel ? (
             <div className="min-w-0">
@@ -133,9 +140,10 @@ export const AppHeader: React.FC = () => {
 
         {/* Right: actions */}
         <div className="flex items-center gap-0.5 shrink-0">
-          {iconBtn(<Phone className="h-4 w-4" />, 'Voice call')}
-          {iconBtn(<Video className="h-4 w-4" />, 'Video call')}
-          {iconBtn(<Info className="h-4 w-4" />, 'Channel info')}
+          <SummarizeMenu
+            channelId={activeType === 'channel' ? activeId : undefined}
+            conversationId={activeType === 'conversation' ? activeId : undefined}
+          />
           <div className="relative">
             {iconBtn(<MoreHorizontal className="h-4 w-4" />, 'More', () => setNotifOpen(!notifOpen))}
             <NotificationsPopover isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
@@ -149,11 +157,11 @@ export const AppHeader: React.FC = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setChatHeaderTab(tab.id)}
             className="px-3 py-2 text-xs font-semibold border-b-2 transition-colors"
             style={{
-              borderBottomColor: activeTab === tab.id ? 'var(--color-accent)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+              borderBottomColor: chatHeaderTab === tab.id ? 'var(--color-accent)' : 'transparent',
+              color: chatHeaderTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
             }}
           >
             {tab.label}

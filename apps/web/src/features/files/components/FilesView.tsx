@@ -7,16 +7,19 @@ import {
   FolderOpen,
   Calendar,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
 import { useWorkspace, useActiveMessages } from '../../../hooks';
 import { Avatar } from '../../../components/ui';
+import { chatService } from '../../../services';
 
 type FileFilter = 'all' | 'images' | 'documents' | 'media';
 
 export const FilesView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FileFilter>('all');
+  const [fileSummary, setFileSummary] = useState<{ name: string; text: string } | null>(null);
   const { setActiveChannel } = useUiStore();
   const { channels } = useWorkspace();
   const { messages } = useActiveMessages();
@@ -94,7 +97,7 @@ export const FilesView: React.FC = () => {
             className="rounded-md px-3 py-1 text-xs font-semibold capitalize transition-all"
             style={{
               background: activeFilter === tab ? 'var(--color-accent-muted)' : 'transparent',
-              color: activeFilter === tab ? '#ffffff' : 'var(--color-text-secondary)',
+              color: activeFilter === tab ? 'var(--color-active-text)' : 'var(--color-text-secondary)',
               border: activeFilter === tab ? '1px solid var(--color-active-border)' : '1px solid transparent',
             }}
           >
@@ -190,6 +193,22 @@ export const FilesView: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="p-1 rounded transition-colors hover:bg-white/10"
+                          title="Summarize file"
+                          style={{ color: 'var(--color-accent)' }}
+                          onClick={() => {
+                            void chatService
+                              .summarizeFileWithAi({ name: file.name, url: file.url, type: file.type })
+                              .then((r) => setFileSummary({ name: file.name, text: r.summary }))
+                              .catch((err) =>
+                                useUiStore.getState().setError(err instanceof Error ? err.message : 'Summarize failed'),
+                              );
+                          }}
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </button>
                         {channel && (
                           <button
                             onClick={() => setActiveChannel(channel.id)}
@@ -219,6 +238,20 @@ export const FilesView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {fileSummary && (
+        <div
+          className="shrink-0 border-t p-4 text-xs whitespace-pre-wrap"
+          style={{
+            borderColor: 'var(--color-border)',
+            background: 'var(--color-header)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          <div className="mb-1 font-semibold">Summary · {fileSummary.name}</div>
+          {fileSummary.text}
+        </div>
+      )}
     </div>
   );
 };

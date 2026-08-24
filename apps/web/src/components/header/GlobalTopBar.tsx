@@ -1,13 +1,37 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
-import { Avatar } from '../ui';
 
 export const GlobalTopBar: React.FC = () => {
-  const { setSearchModalOpen, setProfileModalOpen, toggleSidebar } = useUiStore();
-  const { currentUser, notifications } = useWorkspace();
+  const navigate = useNavigate();
+  const {
+    setSearchModalOpen,
+    toggleSidebar,
+    navIndex,
+    navStack,
+  } = useUiStore();
+  const { notifications } = useWorkspace();
   const unread = notifications.filter((n) => n.unread).length;
+
+  const canGoBack = navIndex > 0;
+  const canGoForward = navIndex >= 0 && navIndex < navStack.length - 1;
+
+  const navBtnClass = (enabled: boolean) =>
+    `flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+      enabled ? 'hover-surface cursor-pointer' : 'opacity-30 cursor-not-allowed'
+    }`;
+
+  const handleBack = () => {
+    if (!canGoBack) return;
+    navigate(-1);
+  };
+
+  const handleForward = () => {
+    if (!canGoForward) return;
+    navigate(1);
+  };
 
   return (
     <div
@@ -17,7 +41,7 @@ export const GlobalTopBar: React.FC = () => {
       {/* Left: back / forward / history */}
       <div className="flex items-center gap-0.5 shrink-0">
         <button
-          className="flex h-7 w-7 items-center justify-center rounded-md md:hidden hover:bg-white/5"
+          className="flex h-7 w-7 items-center justify-center rounded-md md:hidden hover-surface"
           style={{ color: 'var(--color-text-secondary)' }}
           onClick={toggleSidebar}
           aria-label="Toggle sidebar"
@@ -25,16 +49,22 @@ export const GlobalTopBar: React.FC = () => {
           <Menu className="h-4 w-4" />
         </button>
         <button
-          className="flex h-7 w-7 items-center justify-center rounded-md opacity-30 cursor-not-allowed"
+          type="button"
+          className={navBtnClass(canGoBack)}
           style={{ color: 'var(--color-text-secondary)' }}
-          disabled
+          disabled={!canGoBack}
+          onClick={handleBack}
+          aria-label="Go back"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <button
-          className="flex h-7 w-7 items-center justify-center rounded-md opacity-30 cursor-not-allowed"
+          type="button"
+          className={navBtnClass(canGoForward)}
           style={{ color: 'var(--color-text-secondary)' }}
-          disabled
+          disabled={!canGoForward}
+          onClick={handleForward}
+          aria-label="Go forward"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -68,10 +98,10 @@ export const GlobalTopBar: React.FC = () => {
         </kbd>
       </button>
 
-      {/* Right: help + bell + avatar */}
+      {/* Right: help + bell */}
       <div className="flex items-center gap-1 shrink-0">
         <button
-          className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-white/5"
+          className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           <HelpCircle className="h-4 w-4" />
@@ -90,10 +120,6 @@ export const GlobalTopBar: React.FC = () => {
               {unread > 9 ? '9+' : unread}
             </span>
           )}
-        </button>
-
-        <button onClick={() => setProfileModalOpen(true)} className="relative flex h-8 w-8 items-center justify-center rounded-full overflow-hidden">
-          <Avatar name={currentUser.name} src={currentUser.avatarUrl} size="sm" status={currentUser.status} showStatus />
         </button>
       </div>
     </div>

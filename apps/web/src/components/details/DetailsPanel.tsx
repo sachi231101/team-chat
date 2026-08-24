@@ -12,13 +12,26 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace, useActiveMessages } from '../../hooks';
+import { useWorkspace, useActiveMessages, useContextPinnedMessagesQuery, useChatMutations } from '../../hooks';
 import { Avatar } from '../ui';
 
+const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
+
 export const DetailsPanel: React.FC = () => {
-  const { activeId, activeType, detailsPanelOpen, toggleDetailsPanel } = useUiStore();
+  const {
+    activeId,
+    activeType,
+    detailsPanelOpen,
+    toggleDetailsPanel,
+    setChatHeaderTab,
+    setPeopleModalOpen,
+    setInviteModalOpen,
+    setSettingsModalOpen,
+  } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
   const { messages } = useActiveMessages();
+  const pinnedQuery = useContextPinnedMessagesQuery();
+  const { leaveChannel } = useChatMutations();
 
   if (!detailsPanelOpen) return null;
 
@@ -37,11 +50,30 @@ export const DetailsPanel: React.FC = () => {
   const channelMessages = messages.filter(
     (m) => m.channelId === activeId || m.conversationId === activeId,
   );
-  const pinnedCount = channelMessages.filter((m) => m.pinned).length;
+  const pinnedCount = pinnedQuery.data?.length ?? channelMessages.filter((m) => m.pinned).length;
   const filesCount = channelMessages.reduce(
     (acc, m) => acc + (m.attachments?.length ?? 0),
     0,
   );
+  const linksCount = channelMessages.reduce((acc, m) => {
+    const matches = m.content.match(URL_REGEX);
+    return acc + (matches?.length ?? 0);
+  }, 0);
+
+  const openView = (tab: 'files' | 'pinned' | 'links') => {
+    setChatHeaderTab(tab);
+  };
+
+  const handleLeaveChannel = () => {
+    if (!currentChannel) return;
+    const confirmed = window.confirm(`Leave #${currentChannel.name}? You can rejoin public channels later.`);
+    if (!confirmed) return;
+    leaveChannel.mutate(currentChannel.id);
+  };
+
+  const handleSeeAllMembers = () => {
+    setPeopleModalOpen(true);
+  };
 
   const isChannel = activeType === 'channel' && currentChannel;
   const name = isChannel ? currentChannel.name : otherUser?.name ?? '';
@@ -50,8 +82,9 @@ export const DetailsPanel: React.FC = () => {
     : '';
 
   // Show the first 5 users as members
+  const memberCount = isChannel ? (currentChannel.membersCount ?? users.length) : users.length;
   const visibleMembers = users.slice(0, 5);
-  const extraMembers = Math.max(0, users.length - 5);
+  const extraMembers = Math.max(0, memberCount - 5);
 
   const dividerRow = (
     <div className="h-px mx-0 my-1" style={{ background: 'var(--color-border-subtle)' }} />
@@ -147,9 +180,14 @@ export const DetailsPanel: React.FC = () => {
         <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>
-              {users.length} Members
+              {memberCount} Members
             </span>
-            <button className="text-[11px] font-semibold" style={{ color: 'var(--color-accent)' }}>
+            <button
+              type="button"
+              onClick={handleSeeAllMembers}
+              className="text-[11px] font-semibold"
+              style={{ color: 'var(--color-accent)' }}
+            >
               See all
             </button>
           </div>
@@ -173,9 +211,27 @@ export const DetailsPanel: React.FC = () => {
 
       {/* Quick stats */}
       <div className="py-1">
-        {actionRow(<FileText className="h-3.5 w-3.5" />, 'Files', filesCount || 12)}
-        {actionRow(<Pin className="h-3.5 w-3.5" />, 'Pinned', pinnedCount || 4)}
-        {actionRow(<Link2 className="h-3.5 w-3.5" />, 'Links', 8)}
+        {actionRow(
+          <FileText className="h-3.5 w-3.5" />,
+          'Files',
+          filesCount,
+          false,
+          () => openView('files'),
+        )}
+        {actionRow(
+          <Pin className="h-3.5 w-3.5" />,
+          'Pinned',
+          pinnedCount,
+          false,
+          () => openView('pinned'),
+        )}
+        {actionRow(
+          <Link2 className="h-3.5 w-3.5" />,
+          'Links',
+          linksCount,
+          false,
+          () => openView('links'),
+        )}
       </div>
 
       {dividerRow}
@@ -194,10 +250,29 @@ export const DetailsPanel: React.FC = () => {
 
       {/* Actions */}
       <div className="py-1">
-        {actionRow(<Bell className="h-3.5 w-3.5" />, 'Notification preferences')}
-        {isChannel && actionRow(<UserPlus className="h-3.5 w-3.5" />, 'Add members')}
+        {actionRow(
+          <Bell className="h-3.5 w-3.5" />,
+          'Notification preferences',
+          undefined,
+          false,
+          () => setSettingsModalOpen(true),
+        )}
+        {isChannel &&
+          actionRow(
+            <UserPlus className="h-3.5 w-3.5" />,
+            'Add members',
+            undefined,
+            false,
+            () => setInviteModalOpen(true),
+          )}
         {dividerRow}
-        {actionRow(<LogOut className="h-3.5 w-3.5" />, isChannel ? 'Leave channel' : 'Block user', undefined, true)}
+        {actionRow(
+          <LogOut className="h-3.5 w-3.5" />,
+          isChannel ? 'Leave channel' : 'Block user',
+          undefined,
+          true,
+          isChannel ? handleLeaveChannel : undefined,
+        )}
       </div>
     </aside>
   );
