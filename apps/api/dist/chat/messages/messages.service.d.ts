@@ -1,5 +1,6 @@
-import { Message as PrismaMessage, User, MessageReaction, Attachment } from '@prisma/client';
+import { Message as PrismaMessage, User, MessageReaction, Attachment, MessageTag, ActionItem } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { ChatAccessService, UserContext } from '../../common/chat-access.service';
 import { Message } from '@team-chat/shared';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { RealtimeService } from '../../realtime/realtime.service';
@@ -12,6 +13,13 @@ type MessageWithRelations = PrismaMessage & {
     })[];
     attachments: Attachment[];
     replies?: PrismaMessage[];
+    tags?: (MessageTag & {
+        user: User | null;
+    })[];
+    actionItems?: (ActionItem & {
+        assignee?: User | null;
+        creator?: User | null;
+    })[];
 };
 export interface MessageListResult {
     items: Message[];
@@ -20,25 +28,28 @@ export interface MessageListResult {
 }
 export declare class MessagesService {
     private readonly prisma;
+    private readonly chatAccess;
     private readonly realtime;
     private readonly mentions;
     private readonly ai;
-    constructor(prisma: PrismaService, realtime: RealtimeService, mentions: MentionsService, ai: AiOrchestratorService);
-    findAll(userId: string, channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<MessageListResult>;
-    findOne(id: string): Promise<Message>;
-    create(userId: string, body: CreateMessageDto): Promise<Message>;
-    update(id: string, content: string, userId: string): Promise<Message>;
-    delete(id: string, userId: string): Promise<{
+    constructor(prisma: PrismaService, chatAccess: ChatAccessService, realtime: RealtimeService, mentions: MentionsService, ai: AiOrchestratorService);
+    private extractUser;
+    findAll(userOrId: UserContext | string, channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<MessageListResult>;
+    syncSince(userOrId: UserContext | string, channelId?: string, conversationId?: string, since?: string): Promise<Message[]>;
+    findOne(id: string, userOrId?: UserContext | string): Promise<Message>;
+    create(userOrId: UserContext | string, body: CreateMessageDto): Promise<Message>;
+    update(id: string, content: string, userOrId: UserContext | string): Promise<Message>;
+    delete(id: string, userOrId: UserContext | string): Promise<{
         success: boolean;
     }>;
-    togglePin(id: string): Promise<Message>;
-    toggleReaction(messageId: string, emoji: string, userId: string): Promise<Message>;
-    getReplies(parentMessageId: string): Promise<Message[]>;
-    markAsRead(messageId: string, userId: string): Promise<{
+    togglePin(id: string, userOrId?: UserContext | string): Promise<Message>;
+    toggleReaction(messageId: string, emoji: string, userOrId: UserContext | string): Promise<Message>;
+    getReplies(parentMessageId: string, userOrId?: UserContext | string): Promise<Message[]>;
+    markAsRead(messageId: string, userOrId: UserContext | string): Promise<{
         success: boolean;
     }>;
-    findPinnedForUser(userId: string): Promise<Message[]>;
-    findPinned(channelId?: string, conversationId?: string): Promise<Message[]>;
+    findPinnedForUser(userOrId: UserContext | string): Promise<Message[]>;
+    findPinned(channelId?: string, conversationId?: string, userOrId?: UserContext | string): Promise<Message[]>;
     mapMessageToDto(m: MessageWithRelations): Message;
 }
 export {};

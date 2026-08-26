@@ -15,6 +15,9 @@ const threads_module_1 = require("./threads/threads.module");
 const reactions_module_1 = require("./reactions/reactions.module");
 const mentions_module_1 = require("./mentions/mentions.module");
 const saved_messages_module_1 = require("./saved-messages/saved-messages.module");
+const actions_module_1 = require("./actions/actions.module");
+const tags_module_1 = require("./tags/tags.module");
+const polls_module_1 = require("./polls/polls.module");
 let ChatModule = class ChatModule {
 };
 exports.ChatModule = ChatModule;
@@ -28,6 +31,9 @@ exports.ChatModule = ChatModule = __decorate([
             reactions_module_1.ReactionsModule,
             mentions_module_1.MentionsModule,
             saved_messages_module_1.SavedMessagesModule,
+            actions_module_1.ActionsModule,
+            tags_module_1.TagsModule,
+            polls_module_1.PollsModule,
         ],
         exports: [
             channels_module_1.ChannelsModule,
@@ -37,6 +43,9 @@ exports.ChatModule = ChatModule = __decorate([
             reactions_module_1.ReactionsModule,
             mentions_module_1.MentionsModule,
             saved_messages_module_1.SavedMessagesModule,
+            actions_module_1.ActionsModule,
+            tags_module_1.TagsModule,
+            polls_module_1.PollsModule,
         ],
     })
 ], ChatModule);

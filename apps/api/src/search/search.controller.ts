@@ -9,6 +9,7 @@ export class SearchController {
 
   @Get()
   async search(@CurrentUser() user: RequestUser, @Query('q') q: string) {
-    return this.searchService.search(q, user.id, user.workplaceId);
+    return this.searchService.search(q, user.userId, user.workplaceId);
   }
 }
+

@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders } from '../request-user';
+import { readUserFromHeaders, RequestUser } from '../request-user';
 
 @Injectable()
 export class MessageAccessGuard implements CanActivate {
@@ -8,7 +8,8 @@ export class MessageAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const { id: userId } = readUserFromHeaders(req.headers);
+    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
+    req.user = user;
 
     const channelId = req.query?.channelId || req.body?.channelId;
     const conversationId = req.query?.conversationId || req.body?.conversationId;
@@ -19,20 +20,21 @@ export class MessageAccessGuard implements CanActivate {
       req.params?.id;
 
     if (channelId) {
-      await this.chatAccess.assertChannelAccess(userId, channelId);
+      await this.chatAccess.assertChannelAccess(user, channelId);
       return true;
     }
 
     if (conversationId) {
-      await this.chatAccess.assertConversationAccess(userId, conversationId);
+      await this.chatAccess.assertConversationAccess(user, conversationId);
       return true;
     }
 
     if (messageId) {
-      await this.chatAccess.assertMessageAccess(userId, messageId);
+      await this.chatAccess.assertMessageAccess(user, messageId);
       return true;
     }
 
     return true;
   }
 }
+

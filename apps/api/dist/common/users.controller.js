@@ -20,15 +20,16 @@ const update_user_dto_1 = require("./dto/update-user.dto");
 const update_presence_dto_1 = require("../presence/dto/update-presence.dto");
 const prisma_errors_1 = require("./prisma-errors");
 const default_channels_1 = require("./default-channels");
+const decorators_1 = require("./decorators");
 let UsersController = class UsersController {
     prisma;
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async findAll() {
+    async findAll(user) {
         try {
             const users = await this.prisma.user.findMany({
-                where: { workplaceId: 'wp-teamchat-main' },
+                where: { workplaceId: user.workplaceId },
                 orderBy: { createdAt: 'asc' },
             });
             return users.map((u) => ({
@@ -47,11 +48,13 @@ let UsersController = class UsersController {
             throw new common_1.InternalServerErrorException(`Failed to fetch users: ${error.message}`);
         }
     }
-    async findOne(id) {
+    async findOne(id, user) {
         try {
-            const u = await this.prisma.user.findUnique({ where: { id } });
+            const u = await this.prisma.user.findFirst({
+                where: { id, workplaceId: user.workplaceId },
+            });
             if (!u) {
-                throw new common_1.NotFoundException(`User ${id} not found`);
+                throw new common_1.NotFoundException(`User ${id} not found in this workplace`);
             }
             return {
                 id: u.id,
@@ -71,9 +74,10 @@ let UsersController = class UsersController {
             throw new common_1.InternalServerErrorException(`Failed to fetch user ${id}: ${error.message}`);
         }
     }
-    async create(body) {
+    async create(user, body) {
         try {
             const prismaStatus = (body.status?.toUpperCase() || 'ONLINE');
+            const workplaceId = user.workplaceId || body.workplaceId || 'wp-teamchat-main';
             const u = await this.prisma.user.create({
                 data: {
                     name: body.name,
@@ -82,7 +86,7 @@ let UsersController = class UsersController {
                     title: body.title,
                     status: prismaStatus,
                     statusMessage: body.statusMessage,
-                    workplaceId: body.workplaceId || 'wp-teamchat-main',
+                    workplaceId,
                 },
             });
             await (0, default_channels_1.provisionUserPublicChannels)(this.prisma, u.id, u.workplaceId);
@@ -102,8 +106,17 @@ let UsersController = class UsersController {
             throw new common_1.InternalServerErrorException(`Failed to create user: ${error.message}`);
         }
     }
-    async update(id, body) {
+    async update(id, user, body) {
         try {
+            const existing = await this.prisma.user.findFirst({
+                where: { id, workplaceId: user.workplaceId },
+            });
+            if (!existing) {
+                throw new common_1.NotFoundException(`User ${id} not found in this workplace`);
+            }
+            if (id !== user.userId && user.role !== 'admin') {
+                throw new common_1.ForbiddenException('You can only update your own profile');
+            }
             const data = {};
             if (body.name !== undefined)
                 data.name = body.name;
@@ -135,14 +148,25 @@ let UsersController = class UsersController {
             };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to update user ${id}: ${error.message}`);
         }
     }
-    async updateStatus(id, body) {
+    async updateStatus(id, user, body) {
         try {
+            const existing = await this.prisma.user.findFirst({
+                where: { id, workplaceId: user.workplaceId },
+            });
+            if (!existing) {
+                throw new common_1.NotFoundException(`User ${id} not found in this workplace`);
+            }
+            if (id !== user.userId) {
+                throw new common_1.ForbiddenException('You can only update your own status');
+            }
             const prismaStatus = body.status.toUpperCase();
             const u = await this.prisma.user.update({
                 where: { id },
@@ -164,18 +188,31 @@ let UsersController = class UsersController {
             };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
             throw new common_1.InternalServerErrorException(`Failed to update status for user ${id}: ${error.message}`);
         }
     }
-    async delete(id) {
+    async delete(id, user) {
         try {
+            const existing = await this.prisma.user.findFirst({
+                where: { id, workplaceId: user.workplaceId },
+            });
+            if (!existing) {
+                throw new common_1.NotFoundException(`User ${id} not found in this workplace`);
+            }
+            if (id !== user.userId && user.role !== 'admin') {
+                throw new common_1.ForbiddenException('You can only delete your own profile');
+            }
             await this.prisma.user.delete({ where: { id } });
             return { success: true };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
@@ -186,45 +223,51 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_user_dto_1.CreateUserDto]),
+    __metadata("design:paramtypes", [Object, create_user_dto_1.CreateUserDto]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_user_dto_1.UpdateUserDto]),
+    __metadata("design:paramtypes", [String, Object, update_user_dto_1.UpdateUserDto]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id/status'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_presence_dto_1.UpdatePresenceDto]),
+    __metadata("design:paramtypes", [String, Object, update_presence_dto_1.UpdatePresenceDto]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "updateStatus", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "delete", null);
 exports.UsersController = UsersController = __decorate([

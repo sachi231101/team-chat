@@ -24,13 +24,13 @@ let ConversationsController = class ConversationsController {
         this.conversationsService = conversationsService;
     }
     findAll(user) {
-        return this.conversationsService.findAll(user.workplaceId, user.id);
+        return this.conversationsService.findAll(user.workplaceId, user.userId);
     }
     findOne(id, user) {
         return this.conversationsService.findOne(id, user.workplaceId);
     }
     create(user, body) {
-        const participants = Array.from(new Set([user.id, ...(body.participants || [])]));
+        const participants = Array.from(new Set([user.userId, ...(body.participants || [])]));
         return this.conversationsService.create({
             participants,
             workplaceId: user.workplaceId,

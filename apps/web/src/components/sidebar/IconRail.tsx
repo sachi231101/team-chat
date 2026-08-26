@@ -1,37 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Home,
   MessageSquare,
   Bell,
   Files,
   Bookmark,
-  MoreHorizontal,
-  UserPlus,
+  Users,
   Plus,
   Moon,
   Sun,
   Monitor,
+  UserPlus,
+  Hash,
+  Sparkles,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace } from '../../hooks';
+import { useWorkspace, useChatMutations } from '../../hooks';
 import { Tooltip } from '../ui';
-import { MoreMenuPopover } from './MoreMenuPopover';
 import { ProfileMenuPopover } from './ProfileMenuPopover';
 import { cn } from '../../lib/utils';
 
 export const IconRail: React.FC = () => {
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<DOMRect | null>(null);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const quickCreateRef = useRef<HTMLDivElement>(null);
+
   const {
     activeRailTab,
     setActiveRailTab,
-    setInviteModalOpen,
+    setActiveConversation,
+    setPeopleModalOpen,
     setCreateChannelModalOpen,
+    setInviteModalOpen,
+    setDailyBriefingOpen,
+    setMultiAgentStudioOpen,
     theme,
     toggleTheme,
   } = useUiStore();
-  const { currentUser, notifications } = useWorkspace();
+  const { currentUser, notifications, conversations } = useWorkspace();
+  const { createConversation } = useChatMutations();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (quickCreateRef.current && !quickCreateRef.current.contains(e.target as Node)) {
+        setQuickCreateOpen(false);
+      }
+    };
+    if (quickCreateOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [quickCreateOpen]);
 
   const unreadActivity = notifications.filter((n) => n.unread).length;
 
@@ -40,10 +60,7 @@ export const IconRail: React.FC = () => {
       id: 'home' as const,
       label: 'Home',
       icon: <Home className="h-4 w-4" />,
-      onClick: () => {
-        setActiveRailTab('home');
-        setMoreMenuOpen(false);
-      },
+      onClick: () => setActiveRailTab('home'),
     },
     {
       id: 'dms' as const,
@@ -51,7 +68,17 @@ export const IconRail: React.FC = () => {
       icon: <MessageSquare className="h-4 w-4" />,
       onClick: () => {
         setActiveRailTab('dms');
-        setMoreMenuOpen(false);
+        const selfConvo = conversations.find((c) => {
+          const u = Array.from(new Set(c.participants));
+          return u.length === 1 && u[0] === currentUser.id;
+        });
+        if (selfConvo) {
+          setActiveConversation(selfConvo.id);
+        } else if (currentUser?.id) {
+          createConversation.mutate(currentUser.id, {
+            onSuccess: (convo: { id: string }) => setActiveConversation(convo.id),
+          });
+        }
       },
     },
     {
@@ -59,36 +86,19 @@ export const IconRail: React.FC = () => {
       label: 'Activity',
       icon: <Bell className="h-4 w-4" />,
       badge: unreadActivity > 0 ? unreadActivity : undefined,
-      onClick: () => {
-        setActiveRailTab('activity');
-        setMoreMenuOpen(false);
-      },
+      onClick: () => setActiveRailTab('activity'),
     },
     {
       id: 'files' as const,
       label: 'Files',
       icon: <Files className="h-4 w-4" />,
-      onClick: () => {
-        setActiveRailTab('files');
-        setMoreMenuOpen(false);
-      },
+      onClick: () => setActiveRailTab('files'),
     },
     {
       id: 'later' as const,
       label: 'Later',
       icon: <Bookmark className="h-4 w-4" />,
-      onClick: () => {
-        setActiveRailTab('later');
-        setMoreMenuOpen(false);
-      },
-    },
-    {
-      id: 'more' as const,
-      label: 'More',
-      icon: <MoreHorizontal className="h-4 w-4" />,
-      onClick: () => {
-        setMoreMenuOpen(!moreMenuOpen);
-      },
+      onClick: () => setActiveRailTab('later'),
     },
   ];
 
@@ -149,10 +159,7 @@ export const IconRail: React.FC = () => {
 
         {/* Navigation Items with Labels */}
         {railItems.map((item) => {
-          const isActive =
-            item.id === 'more'
-              ? moreMenuOpen
-              : activeRailTab === item.id;
+          const isActive = activeRailTab === item.id;
 
           return (
             <button
@@ -206,8 +213,8 @@ export const IconRail: React.FC = () => {
       </div>
 
       {/* ── Bottom Section: Action Circles & Profile Avatar ── */}
-      <div className="flex flex-col items-center gap-1.5 pt-2 pb-0.5">
-        {/* Invite / People button */}
+      <div className="flex flex-col items-center gap-1.5 pt-2 pb-0.5 w-full">
+        {/* 1. Dedicated Invite Teammates button */}
         <Tooltip content="Invite teammates" side="right">
           <button
             onClick={() => setInviteModalOpen(true)}
@@ -215,23 +222,110 @@ export const IconRail: React.FC = () => {
             style={railActionBtnStyle}
             onMouseEnter={onRailActionEnter}
             onMouseLeave={onRailActionLeave}
+            aria-label="Invite teammates"
           >
-            <UserPlus className="h-3.5 w-3.5" />
+            <UserPlus className="h-3.5 w-3.5 text-violet-400" />
           </button>
         </Tooltip>
 
-        {/* Add Channel / Item */}
-        <Tooltip content="Add item" side="right">
+        {/* 2. People & Directory */}
+        <Tooltip content="People & directory" side="right">
           <button
-            onClick={() => setCreateChannelModalOpen(true)}
+            onClick={() => setPeopleModalOpen(true)}
             className="flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105"
             style={railActionBtnStyle}
             onMouseEnter={onRailActionEnter}
             onMouseLeave={onRailActionLeave}
+            aria-label="People & directory"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Users className="h-3.5 w-3.5" />
           </button>
         </Tooltip>
+
+        {/* 3. Plus (+) Quick Create Button with Popover Menu */}
+        <div ref={quickCreateRef} className="relative">
+          <Tooltip content="Create new..." side="right">
+            <button
+              onClick={() => setQuickCreateOpen((prev) => !prev)}
+              className={`flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105 ${
+                quickCreateOpen ? 'bg-violet-600 text-white' : ''
+              }`}
+              style={quickCreateOpen ? undefined : railActionBtnStyle}
+              onMouseEnter={quickCreateOpen ? undefined : onRailActionEnter}
+              onMouseLeave={quickCreateOpen ? undefined : onRailActionLeave}
+              aria-label="Create new item"
+            >
+              <Plus className={`h-3.5 w-3.5 transition-transform ${quickCreateOpen ? 'rotate-45' : ''}`} />
+            </button>
+          </Tooltip>
+
+          {/* Quick Create Popover Menu */}
+          {quickCreateOpen && (
+            <div
+              className="absolute left-full bottom-0 ml-2 w-52 rounded-xl p-1.5 shadow-2xl z-50 border animate-in fade-in zoom-in-95"
+              style={{
+                background: 'var(--color-modal)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
+              <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                Quick Actions
+              </p>
+
+              {/* Action 1: Invite Teammates */}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickCreateOpen(false);
+                  setInviteModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-300 hover:bg-violet-600/20 transition-colors text-left"
+              >
+                <UserPlus className="h-4 w-4 text-violet-400" />
+                <span>Invite teammates</span>
+              </button>
+
+              {/* Action 2: Create a channel */}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickCreateOpen(false);
+                  setCreateChannelModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
+              >
+                <Hash className="h-4 w-4 text-stone-400" />
+                <span>Create a channel</span>
+              </button>
+
+              {/* Action 3: New Direct Message */}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickCreateOpen(false);
+                  setPeopleModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
+              >
+                <MessageSquare className="h-4 w-4 text-stone-400" />
+                <span>New direct message</span>
+              </button>
+
+              {/* Action 4: Daily Briefing */}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickCreateOpen(false);
+                  setDailyBriefingOpen(true);
+                }}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
+              >
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                <span>Daily Briefing</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Theme toggle */}
         <Tooltip content={`${themeToggle.label}`} side="right">
@@ -253,7 +347,6 @@ export const IconRail: React.FC = () => {
             onClick={(e) => {
               setProfileAnchor(e.currentTarget.getBoundingClientRect());
               setProfileMenuOpen((open) => !open);
-              setMoreMenuOpen(false);
             }}
             className="relative flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm transition-transform hover:scale-105"
             style={{ background: 'var(--color-accent)' }}
@@ -274,10 +367,6 @@ export const IconRail: React.FC = () => {
         </Tooltip>
       </div>
 
-      <MoreMenuPopover
-        isOpen={moreMenuOpen}
-        onClose={() => setMoreMenuOpen(false)}
-      />
       <ProfileMenuPopover
         isOpen={profileMenuOpen}
         onClose={() => setProfileMenuOpen(false)}

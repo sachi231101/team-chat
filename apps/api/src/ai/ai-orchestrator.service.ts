@@ -129,6 +129,18 @@ export class AiOrchestratorService implements OnModuleInit {
         conversationId: message.conversationId,
         parentMessageId: message.parentMessageId ?? (message.channelId ? message.id : undefined),
       });
+    } catch (err) {
+      this.logger.error(`AI response error for agent ${agentId}: ${(err as Error).message}`, (err as Error).stack);
+      try {
+        await this.messages.create(agentId, {
+          content: `I'm having a brief issue generating a response: ${(err as Error).message}. Please try again!`,
+          channelId: message.channelId,
+          conversationId: message.conversationId,
+          parentMessageId: message.parentMessageId ?? (message.channelId ? message.id : undefined),
+        });
+      } catch (innerErr) {
+        this.logger.error(`Failed to post AI error fallback: ${(innerErr as Error).message}`);
+      }
     } finally {
       this.realtime.emitToChat(target, 'typing:stopped', {
         userId: agentId,
@@ -206,6 +218,20 @@ export class AiOrchestratorService implements OnModuleInit {
   }
 
   private async resolveAgent(message: Message): Promise<AgentUserId | null> {
+    const text = message.content?.trim() || '';
+
+    // Check slash commands (e.g. /research, /meeting, /support, /workspace, /notes, /ResearchAgent)
+    const slashMatches = text.match(/\/([a-zA-Z0-9_-]+)/g);
+    if (slashMatches) {
+      for (const sm of slashMatches) {
+        const cmd = sm.slice(1).toLowerCase();
+        if (cmd === 'research' || cmd === 'researchagent') return 'usr-agent-research';
+        if (cmd === 'meeting' || cmd === 'meetingagent' || cmd === 'notes' || cmd === 'notesagent') return 'usr-agent-meeting';
+        if (cmd === 'support' || cmd === 'supportagent') return 'usr-agent-support';
+        if (cmd === 'workspace' || cmd === 'workspaceagent') return 'usr-agent-workspace';
+      }
+    }
+
     const names = this.mentions.extractMentions(message.content);
     const mentioned = await this.agentFromNames(names);
     if (mentioned) return mentioned;

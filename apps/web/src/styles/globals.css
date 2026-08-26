@@ -151,13 +151,17 @@
 
 /* ─── Base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
+html {
+  font-size: 15.5px;
+}
 html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
   background: var(--color-bg);
   color: var(--color-text-primary);
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -12,10 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConversationsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
+const chat_access_service_1 = require("../../common/chat-access.service");
 let ConversationsService = class ConversationsService {
     prisma;
-    constructor(prisma) {
+    chatAccess;
+    constructor(prisma, chatAccess) {
         this.prisma = prisma;
+        this.chatAccess = chatAccess;
     }
     async findAll(workplaceId = 'wp-teamchat-main', userId) {
         try {
@@ -71,6 +74,7 @@ let ConversationsService = class ConversationsService {
         const wpId = data.workplaceId || 'wp-teamchat-main';
         const uniqueParticipants = Array.from(new Set(data.participants));
         try {
+            await this.chatAccess.assertUsersBelongToWorkplace(wpId, uniqueParticipants);
             const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
             if (existing)
                 return existing;
@@ -95,6 +99,8 @@ let ConversationsService = class ConversationsService {
             };
         }
         catch (error) {
+            if (error instanceof common_1.BadRequestException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to create conversation: ${error.message}`);
         }
     }
@@ -126,6 +132,7 @@ let ConversationsService = class ConversationsService {
 exports.ConversationsService = ConversationsService;
 exports.ConversationsService = ConversationsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        chat_access_service_1.ChatAccessService])
 ], ConversationsService);
 //# sourceMappingURL=conversations.service.js.map

@@ -7,6 +7,7 @@ import {
   Delete,
   Body,
   NotFoundException,
+  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
@@ -17,16 +18,18 @@ import { UserStatus as PrismaUserStatus } from '@prisma/client';
 import { isPrismaNotFound } from './prisma-errors';
 import { User, UserStatus } from '@team-chat/shared';
 import { provisionUserPublicChannels } from './default-channels';
+import { CurrentUser } from './decorators';
+import type { RequestUser } from './request-user';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async findAll(): Promise<User[]> {
+  async findAll(@CurrentUser() user: RequestUser): Promise<User[]> {
     try {
       const users = await this.prisma.user.findMany({
-        where: { workplaceId: 'wp-teamchat-main' },
+        where: { workplaceId: user.workplaceId },
         orderBy: { createdAt: 'asc' },
       });
 
@@ -49,11 +52,13 @@ export class UsersController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<User> {
+  async findOne(@Param('id') id: string, @CurrentUser() user: RequestUser): Promise<User> {
     try {
-      const u = await this.prisma.user.findUnique({ where: { id } });
+      const u = await this.prisma.user.findFirst({
+        where: { id, workplaceId: user.workplaceId },
+      });
       if (!u) {
-        throw new NotFoundException(`User ${id} not found`);
+        throw new NotFoundException(`User ${id} not found in this workplace`);
       }
 
       return {
@@ -76,9 +81,11 @@ export class UsersController {
   }
 
   @Post()
-  async create(@Body() body: CreateUserDto): Promise<User> {
+  async create(@CurrentUser() user: RequestUser, @Body() body: CreateUserDto): Promise<User> {
     try {
       const prismaStatus = (body.status?.toUpperCase() || 'ONLINE') as PrismaUserStatus;
+      const workplaceId = user.workplaceId || body.workplaceId || 'wp-teamchat-main';
+
       const u = await this.prisma.user.create({
         data: {
           name: body.name,
@@ -87,7 +94,7 @@ export class UsersController {
           title: body.title,
           status: prismaStatus,
           statusMessage: body.statusMessage,
-          workplaceId: body.workplaceId || 'wp-teamchat-main',
+          workplaceId,
         },
       });
 
@@ -118,9 +125,21 @@ export class UsersController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
     @Body() body: UpdateUserDto,
   ): Promise<User> {
     try {
+      const existing = await this.prisma.user.findFirst({
+        where: { id, workplaceId: user.workplaceId },
+      });
+      if (!existing) {
+        throw new NotFoundException(`User ${id} not found in this workplace`);
+      }
+
+      if (id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You can only update your own profile');
+      }
+
       const data: Record<string, unknown> = {};
       if (body.name !== undefined) data.name = body.name;
       if (body.email !== undefined) data.email = body.email;
@@ -148,6 +167,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
@@ -160,9 +180,21 @@ export class UsersController {
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
     @Body() body: UpdatePresenceDto,
   ): Promise<User> {
     try {
+      const existing = await this.prisma.user.findFirst({
+        where: { id, workplaceId: user.workplaceId },
+      });
+      if (!existing) {
+        throw new NotFoundException(`User ${id} not found in this workplace`);
+      }
+
+      if (id !== user.userId) {
+        throw new ForbiddenException('You can only update your own status');
+      }
+
       const prismaStatus = body.status.toUpperCase() as PrismaUserStatus;
       const u = await this.prisma.user.update({
         where: { id },
@@ -184,6 +216,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
@@ -194,11 +227,23 @@ export class UsersController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string): Promise<{ success: boolean }> {
+  async delete(@Param('id') id: string, @CurrentUser() user: RequestUser): Promise<{ success: boolean }> {
     try {
+      const existing = await this.prisma.user.findFirst({
+        where: { id, workplaceId: user.workplaceId },
+      });
+      if (!existing) {
+        throw new NotFoundException(`User ${id} not found in this workplace`);
+      }
+
+      if (id !== user.userId && user.role !== 'admin') {
+        throw new ForbiddenException('You can only delete your own profile');
+      }
+
       await this.prisma.user.delete({ where: { id } });
       return { success: true };
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
@@ -208,3 +253,4 @@ export class UsersController {
     }
   }
 }
+

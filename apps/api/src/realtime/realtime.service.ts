@@ -18,6 +18,14 @@ export class RealtimeService {
     this.emit(`conversation:${conversationId}`, event, payload);
   }
 
+  emitToWorkplace(workplaceId: string, event: string, payload: unknown) {
+    this.emit(`workplace:${workplaceId}`, event, payload);
+  }
+
+  emitToUser(userId: string, event: string, payload: unknown) {
+    this.emit(`user:${userId}`, event, payload);
+  }
+
   emitToChat(
     target: { channelId?: string | null; conversationId?: string | null },
     event: string,
@@ -46,3 +54,4 @@ export class RealtimeService {
     this.server.to(room).emit(event, payload);
   }
 }
+

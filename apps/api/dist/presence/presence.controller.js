@@ -16,31 +16,38 @@ exports.PresenceController = void 0;
 const common_1 = require("@nestjs/common");
 const presence_service_1 = require("./presence.service");
 const update_presence_dto_1 = require("./dto/update-presence.dto");
+const decorators_1 = require("../common/decorators");
 let PresenceController = class PresenceController {
     presenceService;
     constructor(presenceService) {
         this.presenceService = presenceService;
     }
-    getAllPresence() {
-        return this.presenceService.getAllPresence();
+    getAllPresence(user) {
+        return this.presenceService.getAllPresence(user.workplaceId);
     }
-    setPresence(userId, body) {
-        return this.presenceService.setPresence(userId, body.status, body.statusMessage);
+    setPresence(user, body, userId) {
+        if (userId && userId !== user.userId && user.role !== 'admin') {
+            throw new common_1.ForbiddenException('You can only update your own presence');
+        }
+        const targetId = userId || user.userId;
+        return this.presenceService.setPresence(targetId, body.status, body.statusMessage);
     }
 };
 exports.PresenceController = PresenceController;
 __decorate([
     (0, common_1.Get)(),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], PresenceController.prototype, "getAllPresence", null);
 __decorate([
-    (0, common_1.Patch)(':userId'),
-    __param(0, (0, common_1.Param)('userId')),
+    (0, common_1.Patch)(':userId?'),
+    __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Param)('userId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_presence_dto_1.UpdatePresenceDto]),
+    __metadata("design:paramtypes", [Object, update_presence_dto_1.UpdatePresenceDto, String]),
     __metadata("design:returntype", void 0)
 ], PresenceController.prototype, "setPresence", null);
 exports.PresenceController = PresenceController = __decorate([

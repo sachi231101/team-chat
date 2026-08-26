@@ -10,6 +10,7 @@ const fs_1 = require("fs");
 const app_module_1 = require("./app.module");
 const filters_1 = require("./common/filters");
 const attachments_service_1 = require("./attachments/attachments.service");
+const redis_io_adapter_1 = require("./realtime/redis-io.adapter");
 function allowedOrigins() {
     const raw = process.env.ALLOWED_ORIGINS || '';
     const fromEnv = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -20,6 +21,9 @@ function allowedOrigins() {
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     const logger = new common_1.Logger('Bootstrap');
+    const redisIoAdapter = new redis_io_adapter_1.RedisIoAdapter(app);
+    await redisIoAdapter.connectToRedis();
+    app.useWebSocketAdapter(redisIoAdapter);
     if (!(0, fs_1.existsSync)(attachments_service_1.UPLOAD_DIR)) {
         (0, fs_1.mkdirSync)(attachments_service_1.UPLOAD_DIR, { recursive: true });
     }

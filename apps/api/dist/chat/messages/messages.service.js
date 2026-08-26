@@ -15,25 +15,65 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessagesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
+const chat_access_service_1 = require("../../common/chat-access.service");
+const request_user_1 = require("../../common/request-user");
 const realtime_service_1 = require("../../realtime/realtime.service");
 const mentions_service_1 = require("../mentions/mentions.service");
 const ai_orchestrator_service_1 = require("../../ai/ai-orchestrator.service");
+const MESSAGE_INCLUDE = {
+    sender: true,
+    reactions: { include: { user: true } },
+    attachments: true,
+    tags: { include: { user: true } },
+    actionItems: { include: { assignee: true, creator: true } },
+    poll: {
+        include: {
+            creator: true,
+            votes: {
+                include: {
+                    user: true,
+                },
+            },
+        },
+    },
+    replies: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+    },
+};
 let MessagesService = class MessagesService {
     prisma;
+    chatAccess;
     realtime;
     mentions;
     ai;
-    constructor(prisma, realtime, mentions, ai) {
+    constructor(prisma, chatAccess, realtime, mentions, ai) {
         this.prisma = prisma;
+        this.chatAccess = chatAccess;
         this.realtime = realtime;
         this.mentions = mentions;
         this.ai = ai;
     }
-    async findAll(userId, channelId, conversationId, limit = 50, cursor) {
+    extractUser(userOrId) {
+        if (typeof userOrId === 'string') {
+            return { userId: userOrId, workplaceId: request_user_1.DEFAULT_WORKPLACE_ID };
+        }
+        const userId = ('userId' in userOrId && userOrId.userId) || ('id' in userOrId && userOrId.id) || '';
+        const workplaceId = userOrId.workplaceId || request_user_1.DEFAULT_WORKPLACE_ID;
+        return { userId, workplaceId };
+    }
+    async findAll(userOrId, channelId, conversationId, limit = 50, cursor) {
+        const user = this.extractUser(userOrId);
         if (!channelId && !conversationId) {
             throw new common_1.BadRequestException('channelId or conversationId is required');
         }
         try {
+            if (channelId) {
+                await this.chatAccess.assertChannelAccess(user, channelId);
+            }
+            if (conversationId) {
+                await this.chatAccess.assertConversationAccess(user, conversationId);
+            }
             const where = {
                 deletedAt: null,
                 parentMessageId: null,
@@ -47,15 +87,7 @@ let MessagesService = class MessagesService {
                 where,
                 take: take + 1,
                 ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-                include: {
-                    sender: true,
-                    reactions: { include: { user: true } },
-                    attachments: true,
-                    replies: {
-                        where: { deletedAt: null },
-                        orderBy: { createdAt: 'asc' },
-                    },
-                },
+                include: MESSAGE_INCLUDE,
                 orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             });
             const hasMore = rows.length > take;
@@ -63,7 +95,7 @@ let MessagesService = class MessagesService {
             const chronological = [...page].reverse();
             const lastRead = await this.prisma.readReceipt.findFirst({
                 where: {
-                    userId,
+                    userId: user.userId,
                     message: channelId ? { channelId } : { conversationId },
                 },
                 orderBy: { readAt: 'desc' },
@@ -76,24 +108,57 @@ let MessagesService = class MessagesService {
             };
         }
         catch (error) {
-            if (error instanceof common_1.BadRequestException)
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException || error instanceof common_1.BadRequestException) {
                 throw error;
+            }
             throw new common_1.InternalServerErrorException(`Failed to fetch messages: ${error.message}`);
         }
     }
-    async findOne(id) {
+    async syncSince(userOrId, channelId, conversationId, since) {
+        const user = this.extractUser(userOrId);
+        if (!channelId && !conversationId) {
+            throw new common_1.BadRequestException('channelId or conversationId is required');
+        }
         try {
+            if (channelId) {
+                await this.chatAccess.assertChannelAccess(user, channelId);
+            }
+            if (conversationId) {
+                await this.chatAccess.assertConversationAccess(user, conversationId);
+            }
+            const where = {
+                deletedAt: null,
+            };
+            if (channelId)
+                where.channelId = channelId;
+            if (conversationId)
+                where.conversationId = conversationId;
+            if (since) {
+                where.updatedAt = { gt: new Date(since) };
+            }
+            const rows = await this.prisma.message.findMany({
+                where,
+                include: MESSAGE_INCLUDE,
+                orderBy: { updatedAt: 'asc' },
+                take: 100,
+            });
+            return rows.map((m) => this.mapMessageToDto(m));
+        }
+        catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException || error instanceof common_1.BadRequestException) {
+                throw error;
+            }
+            throw new common_1.InternalServerErrorException(`Failed to sync messages: ${error.message}`);
+        }
+    }
+    async findOne(id, userOrId) {
+        try {
+            if (userOrId) {
+                await this.chatAccess.assertMessageAccess(userOrId, id);
+            }
             const m = await this.prisma.message.findUnique({
                 where: { id },
-                include: {
-                    sender: true,
-                    reactions: { include: { user: true } },
-                    attachments: true,
-                    replies: {
-                        where: { deletedAt: null },
-                        orderBy: { createdAt: 'asc' },
-                    },
-                },
+                include: MESSAGE_INCLUDE,
             });
             if (!m || m.deletedAt) {
                 throw new common_1.NotFoundException(`Message ${id} not found`);
@@ -101,16 +166,35 @@ let MessagesService = class MessagesService {
             return this.mapMessageToDto(m);
         }
         catch (error) {
-            if (error instanceof common_1.NotFoundException)
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
             throw new common_1.InternalServerErrorException(`Failed to fetch message ${id}: ${error.message}`);
         }
     }
-    async create(userId, body) {
+    async create(userOrId, body) {
+        const user = this.extractUser(userOrId);
         const hasChannel = Boolean(body.channelId);
         const hasConversation = Boolean(body.conversationId);
         if (hasChannel === hasConversation) {
             throw new common_1.BadRequestException('Provide exactly one of channelId or conversationId');
+        }
+        if (body.channelId) {
+            await this.chatAccess.assertChannelAccess(user, body.channelId);
+        }
+        if (body.conversationId) {
+            await this.chatAccess.assertConversationAccess(user, body.conversationId);
+        }
+        if (body.parentMessageId) {
+            await this.chatAccess.assertMessageAccess(user, body.parentMessageId);
+        }
+        if (body.clientMessageId) {
+            const existing = await this.prisma.message.findFirst({
+                where: { clientMessageId: body.clientMessageId },
+                include: MESSAGE_INCLUDE,
+            });
+            if (existing) {
+                return this.mapMessageToDto(existing);
+            }
         }
         const trimmedContent = body.content?.trim() ?? '';
         if (!trimmedContent && (!body.attachments || body.attachments.length === 0)) {
@@ -120,8 +204,9 @@ let MessagesService = class MessagesService {
             const m = await this.prisma.$transaction(async (tx) => {
                 const created = await tx.message.create({
                     data: {
+                        clientMessageId: body.clientMessageId,
                         content: trimmedContent,
-                        senderId: userId,
+                        senderId: user.userId,
                         channelId: body.channelId,
                         conversationId: body.conversationId,
                         parentMessageId: body.parentMessageId,
@@ -136,15 +221,7 @@ let MessagesService = class MessagesService {
                             }
                             : undefined,
                     },
-                    include: {
-                        sender: true,
-                        reactions: { include: { user: true } },
-                        attachments: true,
-                        replies: {
-                            where: { deletedAt: null },
-                            orderBy: { createdAt: 'asc' },
-                        },
-                    },
+                    include: MESSAGE_INCLUDE,
                 });
                 if (body.conversationId) {
                     await tx.conversation.update({
@@ -167,32 +244,19 @@ let MessagesService = class MessagesService {
             return dto;
         }
         catch (error) {
-            if (error instanceof common_1.BadRequestException)
+            if (error instanceof common_1.BadRequestException || error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException) {
                 throw error;
+            }
             throw new common_1.InternalServerErrorException(`Failed to create message: ${error.message}`);
         }
     }
-    async update(id, content, userId) {
+    async update(id, content, userOrId) {
         try {
-            const existing = await this.prisma.message.findUnique({ where: { id } });
-            if (!existing || existing.deletedAt) {
-                throw new common_1.NotFoundException(`Message ${id} not found`);
-            }
-            if (existing.senderId !== userId) {
-                throw new common_1.ForbiddenException('You can only edit your own messages');
-            }
+            await this.chatAccess.assertMessageModifyAccess(userOrId, id, undefined, false);
             const m = await this.prisma.message.update({
                 where: { id },
                 data: { content, editedAt: new Date() },
-                include: {
-                    sender: true,
-                    reactions: { include: { user: true } },
-                    attachments: true,
-                    replies: {
-                        where: { deletedAt: null },
-                        orderBy: { createdAt: 'asc' },
-                    },
-                },
+                include: MESSAGE_INCLUDE,
             });
             const dto = this.mapMessageToDto(m);
             this.realtime.emitToChat(dto, 'message:updated', dto);
@@ -205,15 +269,9 @@ let MessagesService = class MessagesService {
             throw new common_1.InternalServerErrorException(`Failed to update message ${id}: ${error.message}`);
         }
     }
-    async delete(id, userId) {
+    async delete(id, userOrId) {
         try {
-            const existing = await this.prisma.message.findUnique({ where: { id } });
-            if (!existing) {
-                throw new common_1.NotFoundException(`Message ${id} not found`);
-            }
-            if (existing.senderId !== userId) {
-                throw new common_1.ForbiddenException('You can only delete your own messages');
-            }
+            const existing = await this.chatAccess.assertMessageModifyAccess(userOrId, id, undefined, true);
             await this.prisma.message.update({
                 where: { id },
                 data: {
@@ -231,8 +289,11 @@ let MessagesService = class MessagesService {
             throw new common_1.InternalServerErrorException(`Failed to delete message ${id}: ${error.message}`);
         }
     }
-    async togglePin(id) {
+    async togglePin(id, userOrId) {
         try {
+            if (userOrId) {
+                await this.chatAccess.assertMessageAccess(userOrId, id);
+            }
             const current = await this.prisma.message.findUnique({ where: { id } });
             if (!current || current.deletedAt) {
                 throw new common_1.NotFoundException(`Message ${id} not found`);
@@ -240,38 +301,28 @@ let MessagesService = class MessagesService {
             const m = await this.prisma.message.update({
                 where: { id },
                 data: { pinned: !current.pinned },
-                include: {
-                    sender: true,
-                    reactions: { include: { user: true } },
-                    attachments: true,
-                    replies: {
-                        where: { deletedAt: null },
-                        orderBy: { createdAt: 'asc' },
-                    },
-                },
+                include: MESSAGE_INCLUDE,
             });
             const dto = this.mapMessageToDto(m);
             this.realtime.emitToChat(dto, 'pin:toggled', { messageId: id, message: dto });
             return dto;
         }
         catch (error) {
-            if (error instanceof common_1.NotFoundException)
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
             throw new common_1.InternalServerErrorException(`Failed to toggle pin for message ${id}: ${error.message}`);
         }
     }
-    async toggleReaction(messageId, emoji, userId) {
+    async toggleReaction(messageId, emoji, userOrId) {
+        const user = this.extractUser(userOrId);
         try {
-            const message = await this.prisma.message.findUnique({ where: { id: messageId } });
-            if (!message || message.deletedAt) {
-                throw new common_1.NotFoundException(`Message ${messageId} not found`);
-            }
+            await this.chatAccess.assertMessageAccess(user, messageId);
             await this.prisma.$transaction(async (tx) => {
                 const existing = await tx.messageReaction.findUnique({
                     where: {
                         messageId_userId_emoji: {
                             messageId,
-                            userId,
+                            userId: user.userId,
                             emoji,
                         },
                     },
@@ -285,13 +336,13 @@ let MessagesService = class MessagesService {
                     await tx.messageReaction.create({
                         data: {
                             messageId,
-                            userId,
+                            userId: user.userId,
                             emoji,
                         },
                     });
                 }
             });
-            const dto = await this.findOne(messageId);
+            const dto = await this.findOne(messageId, user);
             this.realtime.emitToChat(dto, 'reaction:toggled', {
                 messageId,
                 message: dto,
@@ -299,44 +350,46 @@ let MessagesService = class MessagesService {
             return dto;
         }
         catch (error) {
-            if (error instanceof common_1.NotFoundException)
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
             throw new common_1.InternalServerErrorException(`Failed to toggle reaction on message ${messageId}: ${error.message}`);
         }
     }
-    async getReplies(parentMessageId) {
+    async getReplies(parentMessageId, userOrId) {
         try {
+            if (userOrId) {
+                await this.chatAccess.assertMessageAccess(userOrId, parentMessageId);
+            }
             const replies = await this.prisma.message.findMany({
                 where: {
                     parentMessageId,
                     deletedAt: null,
                 },
-                include: {
-                    sender: true,
-                    reactions: { include: { user: true } },
-                    attachments: true,
-                    replies: true,
-                },
+                include: MESSAGE_INCLUDE,
                 orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
             });
             return replies.map((r) => this.mapMessageToDto(r));
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to fetch replies: ${error.message}`);
         }
     }
-    async markAsRead(messageId, userId) {
+    async markAsRead(messageId, userOrId) {
+        const user = this.extractUser(userOrId);
         try {
+            await this.chatAccess.assertMessageAccess(user, messageId);
             await this.prisma.readReceipt.upsert({
                 where: {
                     messageId_userId: {
                         messageId,
-                        userId,
+                        userId: user.userId,
                     },
                 },
                 create: {
                     messageId,
-                    userId,
+                    userId: user.userId,
                 },
                 update: {
                     readAt: new Date(),
@@ -345,16 +398,19 @@ let MessagesService = class MessagesService {
             return { success: true };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to mark message as read: ${error.message}`);
         }
     }
-    async findPinnedForUser(userId) {
+    async findPinnedForUser(userOrId) {
+        const user = this.extractUser(userOrId);
         const memberships = await this.prisma.channelMember.findMany({
-            where: { userId },
+            where: { userId: user.userId },
             select: { channelId: true },
         });
         const convos = await this.prisma.conversationParticipant.findMany({
-            where: { userId },
+            where: { userId: user.userId },
             select: { conversationId: true },
         });
         const rows = await this.prisma.message.findMany({
@@ -362,25 +418,26 @@ let MessagesService = class MessagesService {
                 pinned: true,
                 deletedAt: null,
                 OR: [
-                    { channel: { type: 'PUBLIC' } },
-                    { channelId: { in: memberships.map((m) => m.channelId) } },
-                    { conversationId: { in: convos.map((c) => c.conversationId) } },
+                    { channel: { workplaceId: user.workplaceId, type: 'PUBLIC' } },
+                    { channel: { workplaceId: user.workplaceId }, channelId: { in: memberships.map((m) => m.channelId) } },
+                    { conversation: { workplaceId: user.workplaceId }, conversationId: { in: convos.map((c) => c.conversationId) } },
                 ],
             },
-            include: {
-                sender: true,
-                reactions: { include: { user: true } },
-                attachments: true,
-                replies: { where: { deletedAt: null } },
-            },
+            include: MESSAGE_INCLUDE,
             orderBy: { createdAt: 'desc' },
             take: 100,
         });
         return rows.map((m) => this.mapMessageToDto(m));
     }
-    async findPinned(channelId, conversationId) {
+    async findPinned(channelId, conversationId, userOrId) {
         if (!channelId && !conversationId) {
             throw new common_1.BadRequestException('channelId or conversationId is required');
+        }
+        if (userOrId) {
+            if (channelId)
+                await this.chatAccess.assertChannelAccess(userOrId, channelId);
+            if (conversationId)
+                await this.chatAccess.assertConversationAccess(userOrId, conversationId);
         }
         const where = {
             pinned: true,
@@ -392,12 +449,7 @@ let MessagesService = class MessagesService {
             where.conversationId = conversationId;
         const rows = await this.prisma.message.findMany({
             where,
-            include: {
-                sender: true,
-                reactions: { include: { user: true } },
-                attachments: true,
-                replies: { where: { deletedAt: null } },
-            },
+            include: MESSAGE_INCLUDE,
             orderBy: { createdAt: 'desc' },
             take: 100,
         });
@@ -406,6 +458,7 @@ let MessagesService = class MessagesService {
     mapMessageToDto(m) {
         return {
             id: m.id,
+            clientMessageId: m.clientMessageId ?? undefined,
             content: m.content,
             senderId: m.senderId,
             senderName: m.sender?.name || 'Unknown',
@@ -438,6 +491,70 @@ let MessagesService = class MessagesService {
                     createdAt: a.createdAt.toISOString(),
                 }))
                 : [],
+            tags: m.tags
+                ? m.tags.map((t) => ({
+                    id: t.id,
+                    messageId: t.messageId,
+                    userId: t.userId,
+                    userName: t.user?.name || 'Team Member',
+                    tag: t.tag,
+                    note: t.note ?? undefined,
+                    createdAt: t.createdAt.toISOString(),
+                }))
+                : [],
+            actionItems: m.actionItems
+                ? m.actionItems.map((a) => ({
+                    id: a.id,
+                    title: a.title,
+                    description: a.description ?? undefined,
+                    status: a.status,
+                    dueDate: a.dueDate?.toISOString(),
+                    assigneeId: a.assigneeId ?? undefined,
+                    assigneeName: a.assignee?.name ?? undefined,
+                    assigneeAvatar: a.assignee?.avatarUrl ?? undefined,
+                    creatorId: a.creatorId,
+                    creatorName: a.creator?.name ?? undefined,
+                    messageId: a.messageId ?? undefined,
+                    channelId: a.channelId ?? undefined,
+                    conversationId: a.conversationId ?? undefined,
+                    workplaceId: a.workplaceId,
+                    createdAt: a.createdAt.toISOString(),
+                    updatedAt: a.updatedAt.toISOString(),
+                }))
+                : [],
+            poll: m.poll
+                ? {
+                    id: m.poll.id,
+                    question: m.poll.question,
+                    options: m.poll.options.map((text, index) => {
+                        const votes = (m.poll.votes || []).filter((v) => v.optionIndex === index);
+                        const voteCount = votes.length;
+                        const totalVotes = (m.poll.votes || []).length;
+                        const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                        return {
+                            index,
+                            text,
+                            voteCount,
+                            percentage,
+                            voters: m.poll.isAnonymous
+                                ? undefined
+                                : votes.map((v) => ({
+                                    id: v.user?.id || v.userId,
+                                    name: v.user?.name || 'Team Member',
+                                    avatarUrl: v.user?.avatarUrl,
+                                })),
+                        };
+                    }),
+                    totalVotes: (m.poll.votes || []).length,
+                    totalVoters: new Set((m.poll.votes || []).map((v) => v.userId)).size,
+                    isMultiChoice: m.poll.isMultiChoice,
+                    isAnonymous: m.poll.isAnonymous,
+                    isClosed: m.poll.isClosed,
+                    createdById: m.poll.createdById,
+                    creatorName: m.poll.creator?.name,
+                    createdAt: m.poll.createdAt?.toISOString(),
+                }
+                : undefined,
             createdAt: m.createdAt.toISOString(),
             updatedAt: m.updatedAt.toISOString(),
         };
@@ -446,8 +563,9 @@ let MessagesService = class MessagesService {
 exports.MessagesService = MessagesService;
 exports.MessagesService = MessagesService = __decorate([
     (0, common_1.Injectable)(),
-    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => ai_orchestrator_service_1.AiOrchestratorService))),
+    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => ai_orchestrator_service_1.AiOrchestratorService))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        chat_access_service_1.ChatAccessService,
         realtime_service_1.RealtimeService,
         mentions_service_1.MentionsService,
         ai_orchestrator_service_1.AiOrchestratorService])

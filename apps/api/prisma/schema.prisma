@@ -31,6 +31,26 @@ enum NotificationType {
   DIRECT_MESSAGE
 }
 
+enum ActionItemStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum MessageTagType {
+  DECISION
+  KEY_TAKEAWAY
+  ANNOUNCEMENT
+  FOLLOW_UP
+}
+
+enum DecisionStatus {
+  APPROVED
+  UNDER_REVIEW
+  SUPERSEDED
+}
+
 model User {
   id            String      @id @default(uuid())
   email         String      @unique
@@ -51,10 +71,18 @@ model User {
   notifications           Notification[]
   readReceipts            ReadReceipt[]
   savedMessages           SavedMessage[]
+  assignedActions         ActionItem[]              @relation("AssignedActions")
+  createdActions          ActionItem[]              @relation("CreatedActions")
+  messageTags             MessageTag[]
+  decisions               DecisionRecord[]
+  aiCorrections           AiCorrection[]
+  pollsCreated            Poll[]                    @relation("PollCreator")
+  pollVotes               PollVote[]
 
   @@index([workplaceId])
   @@map("users")
 }
+
 
 model Channel {
   id          String      @id @default(uuid())
@@ -67,9 +95,11 @@ model Channel {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  createdBy User            @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  members   ChannelMember[]
-  messages  Message[]
+  createdBy   User             @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members     ChannelMember[]
+  messages    Message[]
+  actionItems ActionItem[]
+  decisions   DecisionRecord[]
 
   @@unique([workplaceId, name])
   @@index([workplaceId])
@@ -118,6 +148,7 @@ model ConversationParticipant {
 
 model Message {
   id              String    @id @default(uuid())
+  clientMessageId String?
   content         String    @db.Text
   senderId        String
   channelId       String?
@@ -138,12 +169,18 @@ model Message {
   attachments   Attachment[]
   readReceipts  ReadReceipt[]
   savedBy       SavedMessage[]
+  actionItems   ActionItem[]
+  tags          MessageTag[]
+  decisions     DecisionRecord[]
+  poll          Poll?
 
   @@index([channelId, createdAt])
   @@index([conversationId, createdAt])
   @@index([parentMessageId])
+  @@index([clientMessageId])
   @@map("messages")
 }
+
 
 model MessageReaction {
   id        String   @id @default(uuid())
@@ -217,3 +254,159 @@ model SavedMessage {
   @@index([userId])
   @@map("saved_messages")
 }
+
+model ActionItem {
+  id             String           @id @default(uuid())
+  title          String
+  description    String?          @db.Text
+  status         ActionItemStatus @default(TODO)
+  dueDate        DateTime?
+  assigneeId     String?
+  creatorId      String
+  messageId      String?
+  channelId      String?
+  conversationId String?
+  workplaceId    String           @default("wp-teamchat-main")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  assignee User?    @relation("AssignedActions", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator  User     @relation("CreatedActions", fields: [creatorId], references: [id], onDelete: Cascade)
+  message  Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  channel  Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([workplaceId, assigneeId, status])
+  @@index([channelId, status])
+  @@index([messageId])
+  @@map("action_items")
+}
+
+model MessageTag {
+  id        String         @id @default(uuid())
+  messageId String
+  userId    String
+  tag       MessageTagType
+  note      String?
+  createdAt DateTime       @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, tag])
+  @@index([tag, createdAt])
+  @@map("message_tags")
+}
+
+model DecisionRecord {
+  id            String         @id @default(uuid())
+  title         String
+  rationale     String?        @db.Text
+  status        DecisionStatus @default(APPROVED)
+  decidedById   String?
+  channelId     String?
+  messageId     String?
+  impactedAreas String[]       @default([])
+  workplaceId   String         @default("wp-teamchat-main")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  decidedBy User?    @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([workplaceId, createdAt])
+  @@index([channelId, status])
+  @@index([messageId])
+  @@map("decision_records")
+}
+
+model AiCorrection {
+  id            String   @id @default(uuid())
+  workplaceId   String   @default("wp-teamchat-main")
+  userId        String
+  agentId       String?
+  category      String   @default("general")
+  originalText  String   @db.Text
+  correctedText String   @db.Text
+  instruction   String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workplaceId, category])
+  @@map("ai_corrections")
+}
+
+model AiLearningRule {
+  id                 String   @id @default(uuid())
+  workplaceId        String   @default("wp-teamchat-main")
+  rule               String   @db.Text
+  category           String   @default("general")
+  sourceCorrectionId String?
+  active             Boolean  @default(true)
+  confidence         Float    @default(1.0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([workplaceId, active])
+  @@map("ai_learning_rules")
+}
+
+model MultiAgentTrace {
+  id                  String   @id @default(uuid())
+  workplaceId         String   @default("wp-teamchat-main")
+  objective           String   @db.Text
+  participatingAgents String[] @default([])
+  steps               Json     @default("[]")
+  finalResult         String   @db.Text
+  verified            Boolean  @default(true)
+  confidenceScore     Float    @default(0.95)
+  initiatedById       String?
+  channelId           String?
+  createdAt           DateTime @default(now())
+
+  @@index([workplaceId, createdAt])
+  @@map("multi_agent_traces")
+}
+
+model Poll {
+  id             String       @id @default(uuid())
+  question       String
+  options        String[]
+  isMultiChoice  Boolean      @default(false)
+  isAnonymous    Boolean      @default(false)
+  isClosed       Boolean      @default(false)
+  createdById    String
+  messageId      String?      @unique
+  channelId      String?
+  conversationId String?
+  workplaceId    String       @default("wp-teamchat-main")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  creator User       @relation("PollCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  message Message?   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  votes   PollVote[]
+
+  @@index([workplaceId, createdAt])
+  @@index([channelId])
+  @@index([conversationId])
+  @@map("polls")
+}
+
+model PollVote {
+  id          String   @id @default(uuid())
+  pollId      String
+  optionIndex Int
+  userId      String
+  workplaceId String   @default("wp-teamchat-main")
+  createdAt   DateTime @default(now())
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId, optionIndex])
+  @@index([pollId])
+  @@map("poll_votes")
+}
+

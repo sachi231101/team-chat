@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders } from '../request-user';
+import { readUserFromHeaders, RequestUser } from '../request-user';
 
 @Injectable()
 export class ConversationParticipantGuard implements CanActivate {
@@ -12,7 +12,8 @@ export class ConversationParticipantGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const { id: userId } = readUserFromHeaders(req.headers);
+    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
+    req.user = user;
 
     const conversationId =
       req.params?.conversationId ||
@@ -24,7 +25,8 @@ export class ConversationParticipantGuard implements CanActivate {
       return true;
     }
 
-    await this.chatAccess.assertConversationAccess(userId, conversationId);
+    await this.chatAccess.assertConversationAccess(user, conversationId);
     return true;
   }
 }
+

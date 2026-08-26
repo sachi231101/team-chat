@@ -12,8 +12,9 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace, useActiveMessages, useContextPinnedMessagesQuery, useChatMutations } from '../../hooks';
+import { useWorkspace, useActiveMessages, useContextPinnedMessagesQuery, useChatMutations, useResizablePanel } from '../../hooks';
 import { Avatar } from '../ui';
+import { ResizeHandle } from '../common';
 
 const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
 
@@ -25,7 +26,6 @@ export const DetailsPanel: React.FC = () => {
     toggleDetailsPanel,
     setChatHeaderTab,
     setPeopleModalOpen,
-    setInviteModalOpen,
     setSettingsModalOpen,
   } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
@@ -123,11 +123,28 @@ export const DetailsPanel: React.FC = () => {
     </button>
   );
 
+  const { width, isDragging, handleProps } = useResizablePanel({
+    storageKey: 'team_chat_details_panel_width',
+    defaultWidth: 320,
+    minWidth: 260,
+    maxWidth: 600,
+    direction: 'left',
+  });
+
   return (
     <aside
-      className="flex h-full w-[240px] shrink-0 flex-col overflow-y-auto animate-in slide-in-right"
-      style={{ background: 'var(--color-right-panel)', borderLeft: '1px solid var(--color-border)' }}
+      className="relative flex h-full shrink-0 flex-col overflow-y-auto animate-in slide-in-right"
+      style={{
+        width: `${width}px`,
+        background: 'var(--color-right-panel)',
+        borderLeft: '1px solid var(--color-border)',
+      }}
     >
+      <ResizeHandle
+        direction="left"
+        isDragging={isDragging}
+        onMouseDown={handleProps.onMouseDown}
+      />
       {/* Header */}
       <div
         className="flex h-[49px] shrink-0 items-center justify-between px-4"
@@ -263,7 +280,7 @@ export const DetailsPanel: React.FC = () => {
             'Add members',
             undefined,
             false,
-            () => setInviteModalOpen(true),
+            () => setPeopleModalOpen(true),
           )}
         {dividerRow}
         {actionRow(

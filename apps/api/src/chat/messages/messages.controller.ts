@@ -31,12 +31,22 @@ export class MessagesController {
     @Query('cursor') cursor?: string,
   ) {
     return this.messagesService.findAll(
-      user.id,
+      user,
       channelId,
       conversationId,
       limit,
       cursor,
     );
+  }
+
+  @Get('sync')
+  sync(
+    @CurrentUser() user: RequestUser,
+    @Query('channelId') channelId?: string,
+    @Query('conversationId') conversationId?: string,
+    @Query('since') since?: string,
+  ) {
+    return this.messagesService.syncSince(user, channelId, conversationId, since);
   }
 
   @Get('pinned')
@@ -46,19 +56,19 @@ export class MessagesController {
     @Query('conversationId') conversationId?: string,
   ) {
     if (!channelId && !conversationId) {
-      return this.messagesService.findPinnedForUser(user.id);
+      return this.messagesService.findPinnedForUser(user);
     }
-    return this.messagesService.findPinned(channelId, conversationId);
+    return this.messagesService.findPinned(channelId, conversationId, user);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.messagesService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.messagesService.findOne(id, user);
   }
 
   @Post()
   create(@CurrentUser() user: RequestUser, @Body() body: CreateMessageDto) {
-    return this.messagesService.create(user.id, body);
+    return this.messagesService.create(user, body);
   }
 
   @Patch(':id')
@@ -67,17 +77,17 @@ export class MessagesController {
     @Param('id') id: string,
     @Body() body: EditMessageDto,
   ) {
-    return this.messagesService.update(id, body.content, user.id);
+    return this.messagesService.update(id, body.content, user);
   }
 
   @Delete(':id')
   delete(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.messagesService.delete(id, user.id);
+    return this.messagesService.delete(id, user);
   }
 
   @Patch(':id/pin')
-  togglePin(@Param('id') id: string) {
-    return this.messagesService.togglePin(id);
+  togglePin(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.messagesService.togglePin(id, user);
   }
 
   @Post(':id/reactions')
@@ -86,16 +96,17 @@ export class MessagesController {
     @Param('id') id: string,
     @Body() body: ToggleReactionDto,
   ) {
-    return this.messagesService.toggleReaction(id, body.emoji, user.id);
+    return this.messagesService.toggleReaction(id, body.emoji, user);
   }
 
   @Get(':id/replies')
-  getReplies(@Param('id') id: string) {
-    return this.messagesService.getReplies(id);
+  getReplies(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.messagesService.getReplies(id, user);
   }
 
   @Post(':id/read')
   markAsRead(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.messagesService.markAsRead(id, user.id);
+    return this.messagesService.markAsRead(id, user);
   }
 }
+

@@ -20,7 +20,8 @@ let ChannelMemberGuard = class ChannelMemberGuard {
     }
     async canActivate(context) {
         const req = context.switchToHttp().getRequest();
-        const { id: userId } = (0, request_user_1.readUserFromHeaders)(req.headers);
+        const user = req.user || (0, request_user_1.readUserFromHeaders)(req.headers);
+        req.user = user;
         const channelId = req.params?.channelId ||
             (req.route?.path?.includes('channels') ? req.params?.id : undefined) ||
             req.query?.channelId ||
@@ -29,7 +30,7 @@ let ChannelMemberGuard = class ChannelMemberGuard {
             return true;
         }
         try {
-            await this.chatAccess.assertChannelAccess(userId, channelId);
+            await this.chatAccess.assertChannelAccess(user, channelId);
             return true;
         }
         catch (error) {

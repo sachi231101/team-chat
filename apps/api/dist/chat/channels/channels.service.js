@@ -12,11 +12,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChannelsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
+const chat_access_service_1 = require("../../common/chat-access.service");
 const client_1 = require("@prisma/client");
 let ChannelsService = class ChannelsService {
     prisma;
-    constructor(prisma) {
+    chatAccess;
+    constructor(prisma, chatAccess) {
         this.prisma = prisma;
+        this.chatAccess = chatAccess;
     }
     async findAll(workplaceId = 'wp-teamchat-main', userId) {
         try {
@@ -127,8 +130,11 @@ let ChannelsService = class ChannelsService {
             throw new common_1.InternalServerErrorException(`Failed to create channel: ${error.message}`);
         }
     }
-    async getMembers(channelId) {
+    async getMembers(channelId, user) {
         try {
+            if (user) {
+                await this.chatAccess.assertChannelAccess(user, channelId);
+            }
             const members = await this.prisma.channelMember.findMany({
                 where: { channelId },
                 include: { user: true },
@@ -147,11 +153,17 @@ let ChannelsService = class ChannelsService {
             }));
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to fetch channel members: ${error.message}`);
         }
     }
-    async addMembers(channelId, userIds) {
+    async addMembers(channelId, userIds, user) {
         try {
+            if (user) {
+                await this.chatAccess.assertCanManageChannelMembers(user, channelId);
+                await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, userIds);
+            }
             await this.prisma.$transaction(userIds.map((userId) => this.prisma.channelMember.upsert({
                 where: {
                     channelId_userId: { channelId, userId },
@@ -159,20 +171,34 @@ let ChannelsService = class ChannelsService {
                 create: { channelId, userId, role: client_1.ChannelMemberRole.MEMBER },
                 update: {},
             })));
-            return this.getMembers(channelId);
+            return this.getMembers(channelId, user);
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to add channel members: ${error.message}`);
         }
     }
-    async removeMember(channelId, userId) {
+    async removeMember(channelId, targetUserId, user) {
         try {
+            if (user) {
+                const channel = await this.chatAccess.assertChannelAccess(user, channelId);
+                await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, [targetUserId]);
+                if (user.userId !== targetUserId) {
+                    const callerMember = channel.members.find((m) => m.userId === user.userId);
+                    if (callerMember?.role !== client_1.ChannelMemberRole.ADMIN && channel.createdById !== user.userId) {
+                        throw new common_1.ForbiddenException('Only channel admins can remove other members');
+                    }
+                }
+            }
             await this.prisma.channelMember.deleteMany({
-                where: { channelId, userId },
+                where: { channelId, userId: targetUserId },
             });
             return { success: true };
         }
         catch (error) {
+            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+                throw error;
             throw new common_1.InternalServerErrorException(`Failed to remove channel member: ${error.message}`);
         }
     }
@@ -180,6 +206,7 @@ let ChannelsService = class ChannelsService {
 exports.ChannelsService = ChannelsService;
 exports.ChannelsService = ChannelsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        chat_access_service_1.ChatAccessService])
 ], ChannelsService);
 //# sourceMappingURL=channels.service.js.map

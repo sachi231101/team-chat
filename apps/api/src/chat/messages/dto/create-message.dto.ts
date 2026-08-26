@@ -8,6 +8,7 @@ class AttachmentInputDto {
   @IsNumber()
   @Type(() => Number)
   size: number;
+
   @IsString()
   type: string;
 
@@ -16,6 +17,10 @@ class AttachmentInputDto {
 }
 
 export class CreateMessageDto {
+  @IsString()
+  @IsOptional()
+  clientMessageId?: string;
+
   @IsString()
   @IsOptional()
   content?: string;

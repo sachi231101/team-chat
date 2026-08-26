@@ -51,14 +51,19 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
             request_user_1.DEFAULT_WORKPLACE_ID;
         client.data.userId = userId;
         client.data.workplaceId = workplaceId;
-        this.logger.log(`Client connected: ${client.id} as ${userId}`);
+        client.join(`user:${userId}`);
+        client.join(`workplace:${workplaceId}`);
+        this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
     }
     handleDisconnect(client) {
         this.logger.log(`Client disconnected: ${client.id}`);
     }
     async handleJoinChannel(client, data) {
-        const userId = client.data.userId;
-        const allowed = await this.chatAccess.canJoinChannel(userId, data.channelId);
+        const user = {
+            userId: client.data.userId,
+            workplaceId: client.data.workplaceId,
+        };
+        const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
         if (!allowed) {
             return { event: 'error', message: 'Not allowed to join this channel' };
         }
@@ -71,8 +76,11 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
         return { event: 'left', channelId: data.channelId };
     }
     async handleJoinConversation(client, data) {
-        const userId = client.data.userId;
-        const allowed = await this.chatAccess.canJoinConversation(userId, data.conversationId);
+        const user = {
+            userId: client.data.userId,
+            workplaceId: client.data.workplaceId,
+        };
+        const allowed = await this.chatAccess.canJoinConversation(user, data.conversationId);
         if (!allowed) {
             return { event: 'error', message: 'Not allowed to join this conversation' };
         }
@@ -81,9 +89,10 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
     }
     async handlePresenceUpdate(client, data) {
         const userId = client.data.userId;
+        const workplaceId = client.data.workplaceId;
         try {
             const user = await this.presenceService.setPresence(userId, data.status, data.statusMessage);
-            this.realtime.emitGlobal('presence:updated', user);
+            this.realtime.emitToWorkplace(workplaceId, 'presence:updated', user);
             return user;
         }
         catch (error) {
@@ -91,15 +100,41 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
             return { error: 'Failed to update presence' };
         }
     }
-    handleTypingStart(client, data) {
-        const userId = client.data.userId;
-        const payload = { userId, userName: data.userName, channelId: data.channelId, conversationId: data.conversationId };
+    async handleTypingStart(client, data) {
+        const user = {
+            userId: client.data.userId,
+            workplaceId: client.data.workplaceId,
+        };
+        if (data.channelId) {
+            const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
+            if (!allowed)
+                return { error: 'Not authorized' };
+        }
+        if (data.conversationId) {
+            const allowed = await this.chatAccess.canJoinConversation(user, data.conversationId);
+            if (!allowed)
+                return { error: 'Not authorized' };
+        }
+        const payload = { userId: user.userId, userName: data.userName, channelId: data.channelId, conversationId: data.conversationId };
         this.realtime.emitToChat(data, 'typing:started', payload);
     }
-    handleTypingStop(client, data) {
-        const userId = client.data.userId;
+    async handleTypingStop(client, data) {
+        const user = {
+            userId: client.data.userId,
+            workplaceId: client.data.workplaceId,
+        };
+        if (data.channelId) {
+            const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
+            if (!allowed)
+                return { error: 'Not authorized' };
+        }
+        if (data.conversationId) {
+            const allowed = await this.chatAccess.canJoinConversation(user, data.conversationId);
+            if (!allowed)
+                return { error: 'Not authorized' };
+        }
         this.realtime.emitToChat(data, 'typing:stopped', {
-            userId,
+            userId: user.userId,
             channelId: data.channelId,
             conversationId: data.conversationId,
         });
@@ -148,7 +183,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], ChatGateway.prototype, "handleTypingStart", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('typing:stop'),
@@ -156,7 +191,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], ChatGateway.prototype, "handleTypingStop", null);
 exports.ChatGateway = ChatGateway = ChatGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({

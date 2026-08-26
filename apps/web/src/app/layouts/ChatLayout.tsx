@@ -2,7 +2,16 @@ import React, { useEffect } from 'react';
 import { IconRail } from '../../components/sidebar/IconRail';
 import { SidebarPanel } from '../../components/sidebar/SidebarPanel';
 import { GlobalTopBar } from '../../components/header/GlobalTopBar';
-import { MainChatArea } from '../../features/chat/components';
+import {
+  MainChatArea,
+  AiBotPanel,
+  CreateActionModal,
+  ConversationToWorkModal,
+  DailyBriefingModal,
+  MultiAgentStudio,
+  AiLearningSettingsModal,
+  RecordDecisionModal,
+} from '../../features/chat/components';
 import { ThreadPanel } from '../../features/threads/components';
 import { DetailsPanel } from '../../components/details';
 import { ErrorToast } from '../../components/common';
@@ -12,25 +21,24 @@ import { useChatNavigation } from '../../hooks/useChatNavigation';
 import {
   SearchModal,
   CreateChannelModal,
-  InviteModal,
   ProfileModal,
   SettingsModal,
   PeopleModal,
-  HuddleNotesModal,
+  InviteTeammatesModal,
+  CreateSectionModal,
 } from '../../components/modals';
 
 export const ChatLayout: React.FC = () => {
   useChatSession();
   useChatNavigation();
-  const huddleNotesModalOpen = useUiStore((s) => s.huddleNotesModalOpen);
-  const setHuddleNotesModalOpen = useUiStore((s) => s.setHuddleNotesModalOpen);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const detailsPanelOpen = useUiStore((s) => s.detailsPanelOpen);
+  const aiPanelOpen = useUiStore((s) => s.aiPanelOpen);
 
   useEffect(() => {
     const apply = () => {
       if (window.innerWidth < 768) {
-        useUiStore.setState({ sidebarOpen: false, detailsPanelOpen: false });
+        useUiStore.setState({ sidebarOpen: false, detailsPanelOpen: false, aiPanelOpen: false });
       }
     };
     apply();
@@ -54,22 +62,24 @@ export const ChatLayout: React.FC = () => {
         <div className="flex flex-1 overflow-hidden min-w-0">
           <MainChatArea />
           <ThreadPanel />
-          <div className={detailsPanelOpen ? 'hidden lg:flex' : 'hidden'}>
-            <DetailsPanel />
-          </div>
+          {detailsPanelOpen && <DetailsPanel />}
+          {aiPanelOpen && <AiBotPanel />}
         </div>
       </div>
 
       <SearchModal />
       <CreateChannelModal />
-      <InviteModal />
+      <CreateActionModal />
+      <ConversationToWorkModal />
+      <DailyBriefingModal />
+      <MultiAgentStudio />
+      <AiLearningSettingsModal />
+      <RecordDecisionModal />
       <ProfileModal />
       <SettingsModal />
       <PeopleModal />
-      <HuddleNotesModal
-        isOpen={huddleNotesModalOpen}
-        onClose={() => setHuddleNotesModalOpen(false)}
-      />
+      <InviteTeammatesModal />
+      <CreateSectionModal />
       <ErrorToast />
     </div>
   );

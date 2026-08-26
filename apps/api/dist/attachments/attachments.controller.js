@@ -18,7 +18,13 @@ const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const crypto_1 = require("crypto");
 const attachments_service_1 = require("./attachments.service");
+const chat_access_service_1 = require("../common/chat-access.service");
+const decorators_1 = require("../common/decorators");
 let AttachmentsController = class AttachmentsController {
+    chatAccess;
+    constructor(chatAccess) {
+        this.chatAccess = chatAccess;
+    }
     upload(file) {
         if (!file) {
             throw new common_1.BadRequestException('file is required');
@@ -29,6 +35,10 @@ let AttachmentsController = class AttachmentsController {
             type: file.mimetype,
             url: `/uploads/${file.filename}`,
         };
+    }
+    async verifyAccess(id, user) {
+        const attachment = await this.chatAccess.assertAttachmentAccess(user, id);
+        return { allowed: true, attachmentId: attachment.id };
     }
 };
 exports.AttachmentsController = AttachmentsController;
@@ -49,7 +59,16 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AttachmentsController.prototype, "upload", null);
+__decorate([
+    (0, common_1.Get)(':id/access'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AttachmentsController.prototype, "verifyAccess", null);
 exports.AttachmentsController = AttachmentsController = __decorate([
-    (0, common_1.Controller)('attachments')
+    (0, common_1.Controller)('attachments'),
+    __metadata("design:paramtypes", [chat_access_service_1.ChatAccessService])
 ], AttachmentsController);
 //# sourceMappingURL=attachments.controller.js.map

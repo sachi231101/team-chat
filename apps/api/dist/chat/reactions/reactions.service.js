@@ -17,12 +17,12 @@ let ReactionsService = class ReactionsService {
     constructor(messagesService) {
         this.messagesService = messagesService;
     }
-    async addReaction(messageId, emoji, userId) {
-        const updated = await this.messagesService.toggleReaction(messageId, emoji, userId);
+    async addReaction(messageId, emoji, user) {
+        const updated = await this.messagesService.toggleReaction(messageId, emoji, user);
         return { success: true, message: updated };
     }
-    async removeReaction(messageId, emoji, userId) {
-        const updated = await this.messagesService.toggleReaction(messageId, emoji, userId);
+    async removeReaction(messageId, emoji, user) {
+        const updated = await this.messagesService.toggleReaction(messageId, emoji, user);
         return { success: true, message: updated };
     }
 };

@@ -1,4 +1,63 @@
 import React from 'react';
+import { CodeBlock } from '../components/CodeBlock';
+
+
+function renderTokens(text: string): React.ReactNode[] {
+  const tokenPattern = /(@[a-zA-Z0-9_.-]+|#[a-zA-Z0-9_.-]+|\/(?:research|meeting|support|workspace|summarize|recap|[a-zA-Z0-9_-]+Agent|[a-zA-Z0-9_-]+)|\[\d+\])/g;
+  const parts = text.split(tokenPattern);
+
+  return parts.map((part, i) => {
+    if (!part) return null;
+
+    if (part.startsWith('@')) {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[13.5px] font-semibold bg-violet-500/20 text-violet-300"
+        >
+          {part}
+        </span>
+      );
+    }
+
+    if (part.startsWith('#')) {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[13.5px] font-semibold bg-emerald-500/20 text-emerald-300 font-mono"
+        >
+          {part}
+        </span>
+      );
+    }
+
+    if (part.startsWith('/')) {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[13.5px] font-bold bg-sky-500/20 text-sky-300 font-mono"
+        >
+          {part}
+        </span>
+      );
+    }
+
+    const citationMatch = part.match(/^\[(\d+)\]$/);
+    if (citationMatch) {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center mx-0.5 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 cursor-pointer transition-colors"
+          title={`Citation [${citationMatch[1]}]`}
+        >
+          [{citationMatch[1]}]
+        </span>
+      );
+    }
+
+    return <React.Fragment key={i}>{part}</React.Fragment>;
+  });
+}
 
 function renderInline(text: string): React.ReactNode[] {
   const pattern =
@@ -10,7 +69,7 @@ function renderInline(text: string): React.ReactNode[] {
       return (
         <code
           key={i}
-          className="rounded px-1 py-0.5 font-mono text-[11px]"
+          className="rounded px-1.5 py-0.5 font-mono text-[13px]"
           style={{
             background: 'var(--color-code-bg)',
             color: '#7dd3fc',
@@ -60,7 +119,7 @@ function renderInline(text: string): React.ReactNode[] {
         </em>
       );
     }
-    return <React.Fragment key={i}>{chunk}</React.Fragment>;
+    return <React.Fragment key={i}>{renderTokens(chunk)}</React.Fragment>;
   });
 }
 
@@ -82,24 +141,7 @@ export function renderChatMarkdown(content: string): React.ReactNode {
         const lines = part.replace(/^\n/, '').replace(/\n$/, '').split('\n');
         const maybeLang = lines[0] && !lines[0].includes(' ') ? lines[0] : '';
         const code = maybeLang ? lines.slice(1).join('\n') : lines.join('\n');
-        return (
-          <pre
-            key={idx}
-            className="my-2 overflow-x-auto rounded-lg p-3 font-mono text-xs leading-relaxed"
-            style={{
-              background: 'var(--color-code-bg)',
-              border: '1px solid var(--color-code-border)',
-              color: '#7dd3fc',
-            }}
-          >
-            {maybeLang ? (
-              <div className="mb-1 text-[10px] font-semibold" style={{ color: 'var(--color-text-tertiary)' }}>
-                {maybeLang}
-              </div>
-            ) : null}
-            <code>{code}</code>
-          </pre>
-        );
+        return <CodeBlock key={idx} language={maybeLang} code={code} />;
       }
       return (
         <span key={idx} className="whitespace-pre-wrap">
@@ -108,6 +150,7 @@ export function renderChatMarkdown(content: string): React.ReactNode {
       );
     });
   }
+
 
   return <span className="whitespace-pre-wrap">{renderBlocks(content)}</span>;
 }
@@ -135,7 +178,7 @@ function renderBlocks(text: string): React.ReactNode {
       nodes.push(
         <table
           key={`t-${i}`}
-          className="my-2 w-full border-collapse text-xs"
+          className="my-2 w-full border-collapse text-[13.5px]"
           style={{ border: '1px solid var(--color-border)' }}
         >
           <tbody>

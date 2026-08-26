@@ -69,34 +69,8 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
     const cleanQuery = query.toLowerCase().trim();
     const list: MentionItem[] = [];
 
-    // Special channel-wide mentions (only if inside a channel)
-    if (channelId) {
-      if ('channel'.includes(cleanQuery)) {
-        list.push({
-          id: 'special-channel',
-          name: 'channel',
-          subtitle: 'Notify everyone in this channel',
-          isSpecial: true,
-        });
-      }
-      if ('here'.includes(cleanQuery)) {
-        list.push({
-          id: 'special-here',
-          name: 'here',
-          subtitle: 'Notify active members in this channel',
-          isSpecial: true,
-        });
-      }
-    }
-
-    const filteredMembers = [...channelMembers];
-    users
-      .filter((u) => u.id.startsWith('usr-agent-'))
-      .forEach((agent) => {
-        if (!filteredMembers.some((m) => m.id === agent.id)) {
-          filteredMembers.push(agent);
-        }
-      });
+    // Only show actual human members (exclude agents and channels from @ mentions)
+    const filteredMembers = channelMembers.filter((u) => !u.id.startsWith('usr-agent-'));
 
     const visible = filteredMembers.filter(
       (m) =>
@@ -117,7 +91,7 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
     });
 
     return list;
-  }, [query, channelId, channelMembers, users]);
+  }, [query, channelId, channelMembers]);
 
   // Reset selected index when query changes
   useEffect(() => {

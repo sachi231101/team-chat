@@ -61,7 +61,12 @@ export class ChatGateway
       DEFAULT_WORKPLACE_ID;
     client.data.userId = userId;
     client.data.workplaceId = workplaceId;
-    this.logger.log(`Client connected: ${client.id} as ${userId}`);
+
+    // Join user's individual and workplace room
+    client.join(`user:${userId}`);
+    client.join(`workplace:${workplaceId}`);
+
+    this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
   }
 
   handleDisconnect(client: Socket) {
@@ -73,8 +78,11 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { channelId: string },
   ) {
-    const userId = client.data.userId as string;
-    const allowed = await this.chatAccess.canJoinChannel(userId, data.channelId);
+    const user = {
+      userId: client.data.userId as string,
+      workplaceId: client.data.workplaceId as string,
+    };
+    const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
     if (!allowed) {
       return { event: 'error', message: 'Not allowed to join this channel' };
     }
@@ -97,9 +105,12 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
   ) {
-    const userId = client.data.userId as string;
+    const user = {
+      userId: client.data.userId as string,
+      workplaceId: client.data.workplaceId as string,
+    };
     const allowed = await this.chatAccess.canJoinConversation(
-      userId,
+      user,
       data.conversationId,
     );
     if (!allowed) {
@@ -119,13 +130,14 @@ export class ChatGateway
     },
   ) {
     const userId = client.data.userId as string;
+    const workplaceId = client.data.workplaceId as string;
     try {
       const user = await this.presenceService.setPresence(
         userId,
         data.status,
         data.statusMessage,
       );
-      this.realtime.emitGlobal('presence:updated', user);
+      this.realtime.emitToWorkplace(workplaceId, 'presence:updated', user);
       return user;
     } catch (error) {
       this.logger.error(
@@ -136,7 +148,7 @@ export class ChatGateway
   }
 
   @SubscribeMessage('typing:start')
-  handleTypingStart(
+  async handleTypingStart(
     @ConnectedSocket() client: Socket,
     @MessageBody()
     data: {
@@ -145,20 +157,44 @@ export class ChatGateway
       conversationId?: string;
     },
   ) {
-    const userId = client.data.userId as string;
-    const payload = { userId, userName: data.userName, channelId: data.channelId, conversationId: data.conversationId };
+    const user = {
+      userId: client.data.userId as string,
+      workplaceId: client.data.workplaceId as string,
+    };
+    if (data.channelId) {
+      const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
+      if (!allowed) return { error: 'Not authorized' };
+    }
+    if (data.conversationId) {
+      const allowed = await this.chatAccess.canJoinConversation(user, data.conversationId);
+      if (!allowed) return { error: 'Not authorized' };
+    }
+
+    const payload = { userId: user.userId, userName: data.userName, channelId: data.channelId, conversationId: data.conversationId };
     this.realtime.emitToChat(data, 'typing:started', payload);
   }
 
   @SubscribeMessage('typing:stop')
-  handleTypingStop(
+  async handleTypingStop(
     @ConnectedSocket() client: Socket,
     @MessageBody()
     data: { channelId?: string; conversationId?: string },
   ) {
-    const userId = client.data.userId as string;
+    const user = {
+      userId: client.data.userId as string,
+      workplaceId: client.data.workplaceId as string,
+    };
+    if (data.channelId) {
+      const allowed = await this.chatAccess.canJoinChannel(user, data.channelId);
+      if (!allowed) return { error: 'Not authorized' };
+    }
+    if (data.conversationId) {
+      const allowed = await this.chatAccess.canJoinConversation(user, data.conversationId);
+      if (!allowed) return { error: 'Not authorized' };
+    }
+
     this.realtime.emitToChat(data, 'typing:stopped', {
-      userId,
+      userId: user.userId,
       channelId: data.channelId,
       conversationId: data.conversationId,
     });

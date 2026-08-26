@@ -10,12 +10,12 @@ export class SavedMessagesController {
 
   @Get()
   list(@CurrentUser() user: RequestUser) {
-    return this.savedMessages.listMessages(user.id);
+    return this.savedMessages.listMessages(user);
   }
 
   @Get('ids')
   listIds(@CurrentUser() user: RequestUser) {
-    return this.savedMessages.listIds(user.id);
+    return this.savedMessages.listIds(user);
   }
 
   @Post()
@@ -24,7 +24,7 @@ export class SavedMessagesController {
     @CurrentUser() user: RequestUser,
     @Body() body: { messageId: string },
   ) {
-    return this.savedMessages.toggle(user.id, body.messageId);
+    return this.savedMessages.toggle(user, body.messageId);
   }
 
   @Delete(':messageId')
@@ -33,6 +33,7 @@ export class SavedMessagesController {
     @CurrentUser() user: RequestUser,
     @Param('messageId') messageId: string,
   ) {
-    return this.savedMessages.toggle(user.id, messageId);
+    return this.savedMessages.toggle(user, messageId);
   }
 }
+

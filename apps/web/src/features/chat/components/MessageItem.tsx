@@ -13,15 +13,25 @@ import {
   Check,
   Image as ImageIcon,
   Sparkles,
+  CheckSquare,
+  BookmarkCheck,
+  Award,
+  Zap,
+  Bell,
+  Clock,
+  AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
-import { Message } from '@team-chat/shared';
+import { Message, MessageTagType, ActionItemStatus } from '@team-chat/shared';
 import { useUiStore } from '../../../stores';
-import { useWorkspace, useActiveMessages, useChatMutations } from '../../../hooks';
+import { useWorkspace, useChatMutations } from '../../../hooks';
 import { Avatar, Tooltip } from '../../../components/ui';
 import { formatTimestamp } from '../../../utils';
 import { resolveAssetUrl } from '../../../lib/assets';
 import { renderChatMarkdown } from '../lib/renderChatMarkdown';
+import { PollCard } from './PollCard';
 import { cn } from '../../../lib/utils';
+
 
 export interface MessageItemProps {
   message: Message;
@@ -30,25 +40,91 @@ export interface MessageItemProps {
 
 const QUICK_EMOJIS = ['👍', '❤️', '🚀', '🎉', '🔥', '👀', '💯', '✨'];
 
+const TAG_CONFIG: Record<
+  MessageTagType,
+  { label: string; icon: any; color: string; bg: string; border: string }
+> = {
+  DECISION: {
+    label: 'Decision',
+    icon: Award,
+    color: 'text-amber-300',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+  },
+  KEY_TAKEAWAY: {
+    label: 'Key Takeaway',
+    icon: Sparkles,
+    color: 'text-emerald-300',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/20',
+  },
+  ANNOUNCEMENT: {
+    label: 'Announcement',
+    icon: Bell,
+    color: 'text-sky-300',
+    bg: 'bg-sky-500/10',
+    border: 'border-sky-500/20',
+  },
+  FOLLOW_UP: {
+    label: 'Follow Up',
+    icon: Zap,
+    color: 'text-purple-300',
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/20',
+  },
+};
+
 export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply = false }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [localEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
 
   const { currentUser, conversations } = useWorkspace();
   const { savedMessageIds } = useWorkspace();
-  const { openThread, setActiveConversation, focusMessageId } = useUiStore();
-  const { toggleReaction, togglePin, toggleSave, deleteMessage, editMessage, createConversation } = useChatMutations();
+  const {
+    openThread,
+    setActiveConversation,
+    focusMessageId,
+    editingMessageId,
+    setEditingMessageId,
+    openCreateActionForMessage,
+    openExtractWorkForTarget,
+    openRecordDecision,
+    setAiLearningModalOpen,
+  } = useUiStore();
+
+  const isEditing = localEditing || editingMessageId === message.id;
+
+  React.useEffect(() => {
+    if (editingMessageId === message.id) {
+      setEditContent(message.content);
+    }
+  }, [editingMessageId, message.id, message.content]);
+  const {
+    toggleReaction,
+    togglePin,
+    toggleSave,
+    deleteMessage,
+    editMessage,
+    createConversation,
+    toggleMessageTag,
+    updateActionItem,
+    sendMessage,
+  } = useChatMutations();
 
   const isAuthor = message.senderId === currentUser.id;
   const isSaved = savedMessageIds.includes(message.id);
-  const isAiBot = message.senderId?.startsWith('usr-agent-') || message.senderName?.includes('Agent');
+  const isAiBot =
+    message.senderId?.startsWith('usr-agent-') ||
+    message.senderName?.includes('Agent') ||
+    message.senderName?.includes('Assistant');
 
   // Group reactions by emoji
-  const reactionGroups = message.reactions.reduce(
+  const reactionGroups = (message.reactions || []).reduce(
     (acc, curr) => {
       if (!acc[curr.emoji]) acc[curr.emoji] = { count: 0, users: [], hasReacted: false };
       acc[curr.emoji].count += 1;
@@ -64,7 +140,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
       editMessage.mutate({ id: message.id, content: editContent.trim() });
     }
     setIsEditing(false);
+    setEditingMessageId(null);
   };
+
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -96,6 +174,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
       return;
     }
     createConversation.mutate(senderId);
+  };
+
+  const handleToggleActionStatus = (actionId: string, currentStatus: ActionItemStatus) => {
+    const nextStatus: ActionItemStatus = currentStatus === 'DONE' ? 'TODO' : 'DONE';
+    updateActionItem.mutate({ id: actionId, data: { status: nextStatus } });
+  };
+
+  const handleRetrySend = () => {
+    sendMessage.mutate({
+      content: message.content,
+      parentMessageId: message.parentMessageId,
+      clientMessageId: message.clientMessageId,
+    });
   };
 
   return (
@@ -135,40 +226,58 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
           <button
             type="button"
             onClick={openSenderChat}
-            className="text-sm font-bold hover:underline"
+            className="text-[15px] font-bold hover:underline"
             style={{ color: 'var(--color-text-primary)' }}
             title={`Message ${message.senderName}`}
           >
             {message.senderName}
           </button>
           {isAiBot && (
-            <span className="flex items-center gap-0.5 rounded px-1.5 py-0.2 text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-              <Sparkles className="h-2.5 w-2.5" />
+            <span className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+              <Sparkles className="h-3 w-3" />
               <span>AI Teammate</span>
             </span>
           )}
           <span
-            className="text-[11px] leading-none"
+            className="text-xs leading-none"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             {formatTimestamp(message.createdAt)}
           </span>
           {message.editedAt && (
-            <span className="text-[10px] italic" style={{ color: 'var(--color-text-tertiary)' }}>
+            <span className="text-xs italic" style={{ color: 'var(--color-text-tertiary)' }}>
               (edited)
             </span>
           )}
           {message.pinned && (
             <span
-              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-semibold"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold"
               style={{
                 background: 'rgba(245,158,11,0.1)',
                 color: '#f59e0b',
                 border: '1px solid rgba(245,158,11,0.2)',
               }}
             >
-              <Pin className="h-2 w-2" /> Pinned
+              <Pin className="h-2.5 w-2.5" /> Pinned
             </span>
+          )}
+          {/* Outbox delivery status indicators */}
+          {message.deliveryStatus === 'sending' && (
+            <span className="inline-flex items-center gap-1 text-xs text-amber-400">
+              <Clock className="w-3 h-3 animate-spin" />
+              <span>Sending...</span>
+            </span>
+          )}
+          {message.deliveryStatus === 'failed' && (
+            <button
+              type="button"
+              onClick={handleRetrySend}
+              className="inline-flex items-center gap-1 text-xs text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 hover:bg-rose-500/20"
+            >
+              <AlertCircle className="w-3 h-3" />
+              <span>Failed. Click to retry</span>
+              <RotateCcw className="w-3 h-3" />
+            </button>
           )}
         </div>
 
@@ -178,7 +287,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full rounded-lg p-2 text-xs focus:outline-none"
+              className="w-full rounded-lg p-2.5 text-[15px] leading-relaxed focus:outline-none"
               style={{
                 background: 'var(--color-input)',
                 border: '1px solid var(--color-accent)',
@@ -188,20 +297,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
-                if (e.key === 'Escape') { setIsEditing(false); setEditContent(message.content); }
+                if (e.key === 'Escape') { setIsEditing(false); setEditingMessageId(null); setEditContent(message.content); }
               }}
             />
-            <div className="flex gap-2 text-[11px]">
+            <div className="flex gap-2 text-xs">
               <button
                 onClick={handleSaveEdit}
-                className="rounded px-2.5 py-1 font-semibold text-white transition-colors"
+                className="rounded-md px-3 py-1 font-semibold text-white transition-colors"
                 style={{ background: 'var(--color-accent)' }}
               >
                 Save
               </button>
               <button
-                onClick={() => { setIsEditing(false); setEditContent(message.content); }}
-                className="rounded px-2.5 py-1 transition-colors"
+                onClick={() => { setIsEditing(false); setEditingMessageId(null); setEditContent(message.content); }}
+                className="rounded-md px-3 py-1 transition-colors"
                 style={{
                   background: 'rgba(255,255,255,0.06)',
                   color: 'var(--color-text-secondary)',
@@ -213,14 +322,86 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
           </div>
         ) : (
           <div
-            className="mt-0.5 text-sm leading-relaxed"
-            style={{ color: 'var(--color-text-secondary)' }}
+            className="mt-1 text-[15px] leading-relaxed select-text"
+            style={{ color: 'var(--color-text-primary)' }}
           >
             {renderChatMarkdown(message.content)}
           </div>
         )}
 
+        {/* Attached Tags (Pillar 4: Context Preservation) */}
+        {message.tags && message.tags.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {message.tags.map((t) => {
+              const cfg = TAG_CONFIG[t.tag] || TAG_CONFIG.DECISION;
+              const Icon = cfg.icon;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleMessageTag.mutate({ messageId: message.id, tag: t.tag })}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border transition-all ${cfg.bg} ${cfg.color} ${cfg.border} hover:opacity-80`}
+                  title={`Tagged as ${cfg.label} (Click to remove)`}
+                >
+                  <Icon className="w-3 h-3" />
+                  <span>{cfg.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Attached Action Items (Pillar 5: Action Management) */}
+        {message.actionItems && message.actionItems.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {message.actionItems.map((act) => {
+              const isDone = act.status === 'DONE';
+              return (
+                <div
+                  key={act.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all ${
+                    isDone
+                      ? 'bg-stone-950/30 border-stone-800/40 opacity-75'
+                      : 'bg-stone-950/80 border-emerald-500/30 shadow-sm'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleToggleActionStatus(act.id, act.status)}
+                    className="text-stone-400 hover:text-emerald-400 transition-colors"
+                  >
+                    <CheckSquare
+                      className={`w-3.5 h-3.5 ${isDone ? 'text-emerald-400' : 'text-stone-500'}`}
+                    />
+                  </button>
+                  <span
+                    className={`flex-1 font-medium truncate ${
+                      isDone ? 'line-through text-stone-500' : 'text-stone-200'
+                    }`}
+                  >
+                    {act.title}
+                  </span>
+                  {act.assigneeName && (
+                    <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 border border-stone-800 text-[10px]">
+                      @{act.assigneeName}
+                    </span>
+                  )}
+                  {act.dueDate && (
+                    <span className="text-[10px] text-stone-400">
+                      Due {new Date(act.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Interactive Poll */}
+        {message.poll && <PollCard poll={message.poll} />}
+
         {/* Attachments */}
+
         {message.attachments && message.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.attachments.map((att) => {
@@ -231,44 +412,44 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
 
               if (isImg) {
                 return (
-                <div
-                  key={att.id}
-                  className="group/img relative overflow-hidden rounded-xl w-full max-w-md transition-all"
-                  style={{
-                    background: 'var(--color-elevated)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  <div className="relative max-h-80 w-full overflow-hidden">
-                    <img
-                      src={assetUrl}
-                      alt={att.name}
-                      className="max-h-80 w-full object-contain"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-2.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <ImageIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                          {att.name}
-                        </span>
-                        <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                          {(att.size / (1024 * 1024)).toFixed(1)} MB
-                        </span>
-                      </div>
+                  <div
+                    key={att.id}
+                    className="group/img relative overflow-hidden rounded-xl w-full max-w-md transition-all"
+                    style={{
+                      background: 'var(--color-elevated)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div className="relative max-h-80 w-full overflow-hidden">
+                      <img
+                        src={assetUrl}
+                        alt={att.name}
+                        className="max-h-80 w-full object-contain"
+                      />
                     </div>
-                    <a
-                      href={assetUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded p-1.5 transition-colors hover:bg-white/10"
-                      style={{ color: 'var(--color-text-tertiary)' }}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </a>
+                    <div className="flex items-center justify-between p-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ImageIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                            {att.name}
+                          </span>
+                          <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                            {(att.size / (1024 * 1024)).toFixed(1)} MB
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={assetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded p-1.5 transition-colors hover:bg-white/10"
+                        style={{ color: 'var(--color-text-tertiary)' }}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
                   </div>
-                </div>
                 );
               }
 
@@ -416,115 +597,174 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
             ))}
           </div>
 
-          {/* Action buttons */}
-          {[
-            {
-              icon: <Smile className="h-3.5 w-3.5" />,
-              label: 'Add reaction',
-              action: () => setShowEmojiPicker(!showEmojiPicker),
-            },
-            ...(!isThreadReply
-              ? [{
-                  icon: <MessageSquare className="h-3.5 w-3.5" />,
-                  label: 'Reply in thread',
-                  action: () => openThread(message.id),
-                }]
-              : []),
-            {
-              icon: <Pin className="h-3.5 w-3.5" />,
-              label: message.pinned ? 'Unpin' : 'Pin message',
-              action: () => togglePin.mutate(message.id),
-              active: message.pinned,
-            },
-            {
-              icon: <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current")} />,
-              label: isSaved ? 'Remove from saved' : 'Save for later',
-              action: () => toggleSave.mutate(message.id),
-              active: isSaved,
-            },
-            {
-              icon: <MoreHorizontal className="h-3.5 w-3.5" />,
-              label: 'More actions',
-              action: () => setShowMoreActions(!showMoreActions),
-            },
-          ].map((btn, i) => (
-            <Tooltip key={i} content={btn.label} side="top">
+          {/* Core Action Buttons */}
+          <Tooltip content="Add reaction" side="top">
+            <button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
+            >
+              <Smile className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          {!isThreadReply && (
+            <Tooltip content="Reply in thread" side="top">
               <button
-                onClick={btn.action}
-                className="relative flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                style={{
-                  color: btn.active ? (btn.label.includes('Pin') ? 'var(--color-pin)' : 'var(--color-accent)') : 'var(--color-text-secondary)',
-                  background: btn.active ? 'rgba(124,58,237,0.12)' : 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  if (!btn.active) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!btn.active) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-                  }
-                }}
+                onClick={() => openThread(message.id)}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
               >
-                {btn.icon}
+                <MessageSquare className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
-          ))}
+          )}
+
+          {/* AI Advantage 1: Conversation-to-work */}
+          <Tooltip content="Extract Work & Decisions (AI)" side="top">
+            <button
+              onClick={() => openExtractWorkForTarget({ messageId: message.id })}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/15 transition-colors"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          {/* Action Management: Create Action Item (Pillar 5) */}
+          <Tooltip content="Turn into Action Item" side="top">
+            <button
+              onClick={() => openCreateActionForMessage(message)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-400 hover:bg-emerald-500/15 transition-colors"
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          {/* Context Preservation: Tag Decision / Highlight (Pillar 4 & 7) */}
+          <Tooltip content="Tag Decision / Highlight" side="top">
+            <button
+              onClick={() => setShowTagMenu(!showTagMenu)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-amber-400 hover:bg-amber-500/15 transition-colors"
+            >
+              <BookmarkCheck className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content={message.pinned ? 'Unpin message' : 'Pin message'} side="top">
+            <button
+              onClick={() => togglePin.mutate(message.id)}
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+              style={{
+                color: message.pinned ? 'var(--color-pin)' : 'var(--color-text-secondary)',
+                background: message.pinned ? 'rgba(245,158,11,0.12)' : 'transparent',
+              }}
+            >
+              <Pin className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content={isSaved ? 'Remove from saved' : 'Save for later'} side="top">
+            <button
+              onClick={() => toggleSave.mutate(message.id)}
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+              style={{
+                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                background: isSaved ? 'rgba(124,58,237,0.12)' : 'transparent',
+              }}
+            >
+              <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current")} />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="More actions" side="top">
+            <button
+              onClick={() => setShowMoreActions(!showMoreActions)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+
+          {/* Tag Dropdown Menu (Pillar 4) */}
+          {showTagMenu && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowTagMenu(false)} />
+              <div
+                className="absolute right-12 top-full mt-1 w-44 rounded-xl p-1.5 shadow-2xl z-40 animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
+              >
+                <div className="px-2 py-1 text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+                  Tag Message As
+                </div>
+                {(['DECISION', 'KEY_TAKEAWAY', 'ANNOUNCEMENT', 'FOLLOW_UP'] as MessageTagType[]).map((t) => {
+                  const cfg = TAG_CONFIG[t];
+                  const Icon = cfg.icon;
+                  const hasTag = message.tags?.some((x) => x.tag === t);
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => {
+                        toggleMessageTag.mutate({ messageId: message.id, tag: t });
+                        setShowTagMenu(false);
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                        hasTag ? 'bg-amber-500/15 text-amber-300' : 'text-stone-300 hover:bg-stone-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{cfg.label}</span>
+                      </div>
+                      {hasTag && <Check className="w-3 h-3 text-amber-400" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* More dropdown */}
           {showMoreActions && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowMoreActions(false)} />
               <div
-                className="absolute right-0 top-full mt-1 w-40 rounded-lg p-1 shadow-2xl z-40 animate-in fade-in zoom-in-95"
-                style={{ background: 'var(--color-modal)', border: '1px solid var(--color-border)' }}
+                className="absolute right-0 top-full mt-1 w-44 rounded-xl p-1.5 shadow-2xl z-40 animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
               >
                 <button
-                  onClick={() => { toggleSave.mutate(message.id); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                  onClick={() => { openCreateActionForMessage(message); setShowMoreActions(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
                 >
-                  <Bookmark className={cn("h-3 w-3", isSaved && "fill-current text-violet-400")} />
+                  <CheckSquare className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Create Action Item</span>
+                </button>
+                <button
+                  onClick={() => { toggleSave.mutate(message.id); setShowMoreActions(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
+                >
+                  <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current text-violet-400")} />
                   <span>{isSaved ? 'Remove from saved' : 'Save message'}</span>
                 </button>
 
-                <div className="my-1 border-t border-white/10" />
+                <div className="my-1 border-t border-stone-800" />
 
                 <button
                   onClick={handleCopy}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
                 >
-                  {copied ? <Check className="h-3 w-3" style={{ color: 'var(--color-online)' }} /> : <Copy className="h-3 w-3" />}
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                   <span>{copied ? 'Copied!' : 'Copy text'}</span>
                 </button>
                 {isAuthor && (
                   <>
                     <button
                       onClick={() => { setIsEditing(true); setShowMoreActions(false); }}
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
                     >
-                      <Edit2 className="h-3 w-3" />
+                      <Edit2 className="h-3.5 w-3.5 text-sky-400" />
                       <span>Edit message</span>
                     </button>
                     <button
                       onClick={() => { deleteMessage.mutate(message.id); setShowMoreActions(false); }}
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors"
-                      style={{ color: 'var(--color-busy)' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3.5 w-3.5" />
                       <span>Delete</span>
                     </button>
                   </>
@@ -540,16 +780,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
         <>
           <div className="fixed inset-0 z-30" onClick={() => setShowEmojiPicker(false)} />
           <div
-            className="absolute right-4 top-8 z-40 grid grid-cols-4 gap-1 rounded-xl p-2 shadow-2xl animate-in fade-in zoom-in-95"
-            style={{ background: 'var(--color-modal)', border: '1px solid var(--color-border)' }}
+            className="absolute right-4 top-8 z-40 grid grid-cols-4 gap-1 rounded-xl p-2 shadow-2xl animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
           >
             {QUICK_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => { toggleReaction.mutate({ id: message.id, emoji }); setShowEmojiPicker(false); }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110"
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110 hover:bg-stone-800"
               >
                 {emoji}
               </button>

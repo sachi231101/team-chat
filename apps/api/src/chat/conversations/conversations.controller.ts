@@ -11,7 +11,7 @@ export class ConversationsController {
 
   @Get()
   findAll(@CurrentUser() user: RequestUser) {
-    return this.conversationsService.findAll(user.workplaceId, user.id);
+    return this.conversationsService.findAll(user.workplaceId, user.userId);
   }
 
   @Get(':id')
@@ -22,10 +22,11 @@ export class ConversationsController {
 
   @Post()
   create(@CurrentUser() user: RequestUser, @Body() body: CreateConversationDto) {
-    const participants = Array.from(new Set([user.id, ...(body.participants || [])]));
+    const participants = Array.from(new Set([user.userId, ...(body.participants || [])]));
     return this.conversationsService.create({
       participants,
       workplaceId: user.workplaceId,
     });
   }
 }
+

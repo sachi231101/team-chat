@@ -50,22 +50,23 @@ export class NvidiaLlmService {
       throw new Error('AI is not configured (missing AI_API_KEY)');
     }
 
-    const params: NvidiaCreateParams = {
+    const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
       model: this.model(),
       messages,
-      temperature: 1,
+      temperature: 0.7,
       top_p: 0.95,
       max_tokens: this.maxTokens(),
       stream: false,
-      chat_template_kwargs: { thinking: true, reasoning_effort: 'high' },
     };
 
-    const completion = (await this.client.chat.completions.create(
-      params as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
-    )) as NvidiaCompletion;
+    const completion = await this.client.chat.completions.create(params);
 
     const message = completion.choices[0]?.message;
-    const content = message?.content?.trim() ?? '';
+    let content = message?.content?.trim() ?? '';
+
+    // Strip out <think>...</think> tags if emitted by reasoning models
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
     if (!content) {
       this.logger.warn('NVIDIA completion returned empty content');
     }

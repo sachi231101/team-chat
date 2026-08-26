@@ -9,16 +9,17 @@ export class NotificationsController {
 
   @Get()
   async findAll(@CurrentUser() user: RequestUser) {
-    return this.notificationsService.findAll(user.id);
+    return this.notificationsService.findAll(user.userId);
   }
 
   @Patch(':id/read')
   async markAsRead(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.notificationsService.markAsRead(id, user.id);
+    return this.notificationsService.markAsRead(id, user.userId);
   }
 
   @Post('read-all')
   async markAllAsRead(@CurrentUser() user: RequestUser) {
-    return this.notificationsService.markAllAsRead(user.id);
+    return this.notificationsService.markAllAsRead(user.userId);
   }
 }
+

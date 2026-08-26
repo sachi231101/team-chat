@@ -5,15 +5,23 @@ import {
   Star,
   MoreHorizontal,
   PanelRight,
+  Search,
+  FileEdit,
+  Plus,
+  MessageSquare,
+  Sparkles,
+  CheckSquare,
+  BookmarkCheck,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace } from '../../hooks';
+import { useWorkspace, useContextActionsQuery, useContextDecisionsQuery } from '../../hooks';
 import { Avatar, Tooltip } from '../ui';
 import { NotificationsPopover } from './NotificationsPopover';
 import { SummarizeMenu } from './SummarizeMenu';
 
 export const AppHeader: React.FC = () => {
   const [notifOpen, setNotifOpen] = useState(false);
+  const [isSelfStarred, setIsSelfStarred] = useState(false);
 
   const {
     activeId,
@@ -24,13 +32,29 @@ export const AppHeader: React.FC = () => {
     detailsPanelOpen,
     starredChannelIds,
     toggleStarChannel,
-  } = useUiStore();  const { channels, conversations, users, currentUser } = useWorkspace();
+    setSearchModalOpen,
+  } = useUiStore();
+  const { channels, conversations, users, currentUser } = useWorkspace();
+  const actionsQuery = useContextActionsQuery();
+  const decisionsQuery = useContextDecisionsQuery();
+
+  const actionCount = actionsQuery.data?.length ?? 0;
+  const decisionCount = decisionsQuery.data?.length ?? 0;
 
   const currentChannel = channels.find((c) => c.id === activeId);
   const isStarred = activeType === 'channel' && currentChannel
     ? starredChannelIds.includes(currentChannel.id)
     : false;
   const currentConversation = conversations.find((c) => c.id === activeId);
+  const isSelf = Boolean(
+    activeType === 'conversation' &&
+    currentConversation &&
+    (currentConversation.participants.length === 1 ||
+      (currentConversation.participants.length === 2 &&
+        currentConversation.participants[0] === currentUser.id &&
+        currentConversation.participants[1] === currentUser.id)),
+  );
+
   const otherUser =
     activeType === 'conversation' && currentConversation
       ? users.find(
@@ -41,9 +65,12 @@ export const AppHeader: React.FC = () => {
         )
       : null;
 
+  const isSelfConvo = isSelf || (otherUser && otherUser.id === currentUser.id);
 
-  const tabs: { id: typeof chatHeaderTab; label: string }[] = [
+  const tabs: { id: typeof chatHeaderTab; label: string; count?: number; icon?: any }[] = [
     { id: 'messages', label: 'Messages' },
+    { id: 'actions', label: 'Actions', count: actionCount, icon: CheckSquare },
+    { id: 'decisions', label: 'Decisions', count: decisionCount, icon: BookmarkCheck },
     { id: 'files', label: 'Files' },
     { id: 'pinned', label: 'Pinned' },
     { id: 'links', label: 'Links' },
@@ -76,6 +103,8 @@ export const AppHeader: React.FC = () => {
     </Tooltip>
   );
 
+  const userInitial = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U';
+
   return (
     <header
       className="w-full shrink-0"
@@ -95,19 +124,34 @@ export const AppHeader: React.FC = () => {
             >
               <Star className={`h-4 w-4 ${isStarred ? 'fill-current' : ''}`} />
             </button>
+          ) : isSelfConvo ? (
+            <button
+              type="button"
+              onClick={() => setIsSelfStarred((p) => !p)}
+              className="shrink-0 transition-colors"
+              style={{ color: isSelfStarred ? '#eab308' : 'var(--color-text-tertiary)' }}
+              title={isSelfStarred ? 'Unstar' : 'Star'}
+            >
+              <Star className={`h-4 w-4 ${isSelfStarred ? 'fill-current' : ''}`} />
+            </button>
           ) : (
             <span className="w-4" />
           )}
 
           {activeType === 'channel' && currentChannel ? (
-            <div className="min-w-0">
+            <button
+              type="button"
+              onClick={toggleDetailsPanel}
+              className="flex flex-col items-start min-w-0 text-left rounded-lg p-1 -ml-1 hover-surface transition-colors cursor-pointer group"
+              title="Click to view channel details"
+            >
               <div className="flex items-center gap-1.5">
                 {currentChannel.type === 'private' ? (
                   <Lock className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                 ) : (
                   <Hash className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
                 )}
-                <h2 className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                <h2 className="text-sm font-bold truncate group-hover:underline" style={{ color: 'var(--color-text-primary)' }}>
                   {currentChannel.name}
                 </h2>
               </div>
@@ -117,29 +161,53 @@ export const AppHeader: React.FC = () => {
                   : 'Company-wide discussions • '}
                 <span>24 members</span>
               </p>
-            </div>
+            </button>
+          ) : isSelfConvo ? (
+            <button
+              type="button"
+              onClick={toggleDetailsPanel}
+              className="flex items-center gap-2 min-w-0 text-left rounded-lg p-1 -ml-1 hover-surface transition-colors cursor-pointer group"
+              title="Click to view details"
+            >
+              <div className="relative shrink-0">
+                <div
+                  className="flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold text-white shadow-sm"
+                  style={{ background: '#9333ea' }}
+                >
+                  {userInitial}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full border border-slate-900 bg-emerald-500" />
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h2 className="text-sm font-bold truncate group-hover:underline" style={{ color: 'var(--color-text-primary)' }}>
+                  {currentUser.name}
+                </h2>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+              </div>
+            </button>
           ) : otherUser ? (
-            <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={toggleDetailsPanel}
+              className="flex items-center gap-2 min-w-0 text-left rounded-lg p-1 -ml-1 hover-surface transition-colors cursor-pointer group"
+              title="Click to view details"
+            >
               <Avatar name={otherUser.name} src={otherUser.avatarUrl} size="xs" status={otherUser.status} showStatus />
               <div className="min-w-0">
-                <h2 className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                <h2 className="text-sm font-bold truncate group-hover:underline" style={{ color: 'var(--color-text-primary)' }}>
                   {otherUser.name}
-                  {otherUser.id === currentUser.id ? (
-                    <span className="ml-1.5 font-normal" style={{ color: 'var(--color-text-tertiary)' }}>
-                      you
-                    </span>
-                  ) : null}
                 </h2>
                 <p className="text-[11px] capitalize" style={{ color: 'var(--color-online)' }}>
                   {otherUser.status === 'online' ? 'Online' : otherUser.status}
                 </p>
               </div>
-            </div>
+            </button>
           ) : null}
         </div>
 
         {/* Right: actions */}
         <div className="flex items-center gap-0.5 shrink-0">
+          {iconBtn(<Search className="h-4 w-4" />, 'Search messages', () => setSearchModalOpen(true))}
           <SummarizeMenu
             channelId={activeType === 'channel' ? activeId : undefined}
             conversationId={activeType === 'conversation' ? activeId : undefined}
@@ -148,25 +216,35 @@ export const AppHeader: React.FC = () => {
             {iconBtn(<MoreHorizontal className="h-4 w-4" />, 'More', () => setNotifOpen(!notifOpen))}
             <NotificationsPopover isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
           </div>
-          {iconBtn(<PanelRight className="h-4 w-4" />, detailsPanelOpen ? 'Hide details' : 'Channel details', toggleDetailsPanel, detailsPanelOpen)}
+          {iconBtn(<PanelRight className="h-4 w-4" />, detailsPanelOpen ? 'Hide details' : 'Details', toggleDetailsPanel, detailsPanelOpen)}
         </div>
       </div>
 
-      {/* Row 2: Tabs — Messages / Files / Pinned */}
+      {/* Row 2: Tabs */}
       <div className="flex items-center gap-1 px-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setChatHeaderTab(tab.id)}
-            className="px-3 py-2 text-xs font-semibold border-b-2 transition-colors"
-            style={{
-              borderBottomColor: chatHeaderTab === tab.id ? 'var(--color-accent)' : 'transparent',
-              color: chatHeaderTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = chatHeaderTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setChatHeaderTab(tab.id)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors"
+              style={{
+                borderBottomColor: isActive ? 'var(--color-accent)' : 'transparent',
+                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+              }}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-stone-800 text-stone-300">
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </header>
   );

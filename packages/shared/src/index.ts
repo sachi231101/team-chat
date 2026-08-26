@@ -4,3 +4,6 @@ export * from './types/message';
 export * from './types/presence';
 export * from './types/notification';
 export * from './types/attachment';
+export * from './types/action-item';
+export * from './types/message-tag';
+export * from './types/ai-features';

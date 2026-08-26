@@ -17,4 +17,7 @@ export interface NotificationItem {
     unread: boolean;
     type: 'mention' | 'reply' | 'reaction' | 'dm';
     channelId?: string;
+    conversationId?: string;
+    messageId?: string;
+    createdAt?: string;
 }

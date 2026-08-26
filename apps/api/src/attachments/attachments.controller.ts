@@ -1,6 +1,8 @@
 import {
   Controller,
+  Get,
   Post,
+  Param,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -9,9 +11,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
 import { UPLOAD_DIR } from './attachments.service';
+import { ChatAccessService } from '../common/chat-access.service';
+import { CurrentUser } from '../common/decorators';
+import type { RequestUser } from '../common/request-user';
 
 @Controller('attachments')
 export class AttachmentsController {
+  constructor(private readonly chatAccess: ChatAccessService) {}
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -36,4 +43,14 @@ export class AttachmentsController {
       url: `/uploads/${file.filename}`,
     };
   }
+
+  @Get(':id/access')
+  async verifyAccess(
+    @Param('id') id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const attachment = await this.chatAccess.assertAttachmentAccess(user, id);
+    return { allowed: true, attachmentId: attachment.id };
+  }
 }
+

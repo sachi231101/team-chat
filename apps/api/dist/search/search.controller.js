@@ -22,7 +22,7 @@ let SearchController = class SearchController {
         this.searchService = searchService;
     }
     async search(user, q) {
-        return this.searchService.search(q, user.id, user.workplaceId);
+        return this.searchService.search(q, user.userId, user.workplaceId);
     }
 };
 exports.SearchController = SearchController;

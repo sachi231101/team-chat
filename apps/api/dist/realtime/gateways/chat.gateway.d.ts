@@ -52,9 +52,13 @@ export declare class ChatGateway implements OnGatewayInit, OnGatewayConnection, 
         userName: string;
         channelId?: string;
         conversationId?: string;
-    }): void;
+    }): Promise<{
+        error: string;
+    } | undefined>;
     handleTypingStop(client: Socket, data: {
         channelId?: string;
         conversationId?: string;
-    }): void;
+    }): Promise<{
+        error: string;
+    } | undefined>;
 }

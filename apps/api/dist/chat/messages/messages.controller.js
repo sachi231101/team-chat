@@ -26,37 +26,40 @@ let MessagesController = class MessagesController {
         this.messagesService = messagesService;
     }
     findAll(user, channelId, conversationId, limit, cursor) {
-        return this.messagesService.findAll(user.id, channelId, conversationId, limit, cursor);
+        return this.messagesService.findAll(user, channelId, conversationId, limit, cursor);
+    }
+    sync(user, channelId, conversationId, since) {
+        return this.messagesService.syncSince(user, channelId, conversationId, since);
     }
     findPinned(user, channelId, conversationId) {
         if (!channelId && !conversationId) {
-            return this.messagesService.findPinnedForUser(user.id);
+            return this.messagesService.findPinnedForUser(user);
         }
-        return this.messagesService.findPinned(channelId, conversationId);
+        return this.messagesService.findPinned(channelId, conversationId, user);
     }
-    findOne(id) {
-        return this.messagesService.findOne(id);
+    findOne(id, user) {
+        return this.messagesService.findOne(id, user);
     }
     create(user, body) {
-        return this.messagesService.create(user.id, body);
+        return this.messagesService.create(user, body);
     }
     update(user, id, body) {
-        return this.messagesService.update(id, body.content, user.id);
+        return this.messagesService.update(id, body.content, user);
     }
     delete(user, id) {
-        return this.messagesService.delete(id, user.id);
+        return this.messagesService.delete(id, user);
     }
-    togglePin(id) {
-        return this.messagesService.togglePin(id);
+    togglePin(id, user) {
+        return this.messagesService.togglePin(id, user);
     }
     toggleReaction(user, id, body) {
-        return this.messagesService.toggleReaction(id, body.emoji, user.id);
+        return this.messagesService.toggleReaction(id, body.emoji, user);
     }
-    getReplies(id) {
-        return this.messagesService.getReplies(id);
+    getReplies(id, user) {
+        return this.messagesService.getReplies(id, user);
     }
     markAsRead(user, id) {
-        return this.messagesService.markAsRead(id, user.id);
+        return this.messagesService.markAsRead(id, user);
     }
 };
 exports.MessagesController = MessagesController;
@@ -72,6 +75,16 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "findAll", null);
 __decorate([
+    (0, common_1.Get)('sync'),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('channelId')),
+    __param(2, (0, common_1.Query)('conversationId')),
+    __param(3, (0, common_1.Query)('since')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String, String]),
+    __metadata("design:returntype", void 0)
+], MessagesController.prototype, "sync", null);
+__decorate([
     (0, common_1.Get)('pinned'),
     __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Query)('channelId')),
@@ -83,8 +96,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "findOne", null);
 __decorate([
@@ -115,8 +129,9 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/pin'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "togglePin", null);
 __decorate([
@@ -131,8 +146,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id/replies'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], MessagesController.prototype, "getReplies", null);
 __decorate([

@@ -6,6 +6,9 @@ import { ThreadsModule } from './threads/threads.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { MentionsModule } from './mentions/mentions.module';
 import { SavedMessagesModule } from './saved-messages/saved-messages.module';
+import { ActionsModule } from './actions/actions.module';
+import { TagsModule } from './tags/tags.module';
+import { PollsModule } from './polls/polls.module';
 
 @Module({
   imports: [
@@ -16,6 +19,9 @@ import { SavedMessagesModule } from './saved-messages/saved-messages.module';
     ReactionsModule,
     MentionsModule,
     SavedMessagesModule,
+    ActionsModule,
+    TagsModule,
+    PollsModule,
   ],
   exports: [
     ChannelsModule,
@@ -25,6 +31,10 @@ import { SavedMessagesModule } from './saved-messages/saved-messages.module';
     ReactionsModule,
     MentionsModule,
     SavedMessagesModule,
+    ActionsModule,
+    TagsModule,
+    PollsModule,
   ],
 })
 export class ChatModule {}
+

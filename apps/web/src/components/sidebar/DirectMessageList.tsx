@@ -19,7 +19,7 @@ function dmRowStyle(isActive: boolean, hasUnread: boolean): React.CSSProperties 
 }
 
 export const DirectMessageList: React.FC = () => {
-  const { activeId, activeType, setActiveConversation, setPeopleModalOpen } = useUiStore();
+  const { activeId, activeType, setActiveConversation, setPeopleModalOpen, setInviteModalOpen } = useUiStore();
   const { conversations, users, currentUser } = useWorkspace();
   const { createConversation } = useChatMutations();
 
@@ -42,7 +42,7 @@ export const DirectMessageList: React.FC = () => {
       <button
         type="button"
         onClick={openSelfNotes}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-[5px] text-xs transition-all"
+        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] transition-all"
         style={dmRowStyle(selfIsActive, false)}
         onMouseEnter={(e) => {
           if (!selfIsActive)
@@ -89,7 +89,7 @@ export const DirectMessageList: React.FC = () => {
 
       <button
         type="button"
-        onClick={() => setPeopleModalOpen(true)}
+        onClick={() => setInviteModalOpen(true)}
         className="flex w-full items-center gap-1.5 rounded-md px-2 py-[5px] text-xs transition-colors"
         style={{ color: 'var(--color-text-secondary)' }}
         onMouseEnter={(e) => {
@@ -101,8 +101,8 @@ export const DirectMessageList: React.FC = () => {
           (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
         }}
       >
-        <Plus className="h-3.5 w-3.5 shrink-0" />
-        <span>Invite people</span>
+        <Plus className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+        <span className="font-medium">Invite teammates</span>
       </button>
     </div>
   );
@@ -118,7 +118,7 @@ const DmRow: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className="flex w-full items-center justify-between rounded-md px-2 py-[5px] text-xs transition-all"
+    className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[14px] transition-all"
     style={dmRowStyle(isActive, hasUnread)}
     onMouseEnter={(e) => {
       if (!isActive)

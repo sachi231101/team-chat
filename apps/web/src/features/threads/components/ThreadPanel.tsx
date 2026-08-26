@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { X, MessageSquare } from 'lucide-react';
 import { useUiStore } from '../../../stores';
-import { useWorkspace, useActiveMessages } from '../../../hooks';
+import { useWorkspace, useActiveMessages, useResizablePanel } from '../../../hooks';
 import { chatService } from '../../../services';
 import { MessageItem, MessageComposer } from '../../chat/components';
 import { Button } from '../../../components/ui';
+import { ResizeHandle } from '../../../components/common';
 import { SummarizeMenu } from '../../../components/header/SummarizeMenu';
 
 export const ThreadPanel: React.FC = () => {
@@ -14,6 +15,14 @@ export const ThreadPanel: React.FC = () => {
   const activeType = useUiStore((s) => s.activeType);
   const { channels } = useWorkspace();
   const { messages } = useActiveMessages();
+
+  const { width, isDragging, handleProps } = useResizablePanel({
+    storageKey: 'team_chat_thread_panel_width',
+    defaultWidth: 420,
+    minWidth: 320,
+    maxWidth: 780,
+    direction: 'left',
+  });
 
   const cachedParent = messages.find((m) => m.id === activeThreadId);
 
@@ -38,13 +47,19 @@ export const ThreadPanel: React.FC = () => {
 
   return (
     <aside
-      className="flex h-full w-80 shrink-0 flex-col sm:w-96 z-30 animate-in slide-in-right"
+      className="relative flex h-full shrink-0 flex-col z-30 animate-in slide-in-right"
       style={{
+        width: `${width}px`,
         background: 'var(--color-right-panel)',
         borderLeft: '1px solid var(--color-border)',
         boxShadow: '-8px 0 24px rgba(0,0,0,0.25)',
       }}
     >
+      <ResizeHandle
+        direction="left"
+        isDragging={isDragging}
+        onMouseDown={handleProps.onMouseDown}
+      />
       <div
         className="flex h-14 shrink-0 items-center justify-between px-4"
         style={{ borderBottom: '1px solid var(--color-border)' }}
@@ -66,14 +81,6 @@ export const ThreadPanel: React.FC = () => {
             conversationId={activeType === 'conversation' ? activeId : undefined}
             parentMessageId={activeThreadId ?? undefined}
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => useUiStore.getState().setHuddleNotesModalOpen(true)}
-            title="Meeting notes"
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
           <Button variant="ghost" size="icon" onClick={closeThread}>
             <X className="h-4 w-4" />
           </Button>

@@ -16,16 +16,17 @@ exports.ReactionsController = void 0;
 const common_1 = require("@nestjs/common");
 const reactions_service_1 = require("./reactions.service");
 const decorators_1 = require("../../common/decorators");
+const guards_1 = require("../../common/guards");
 let ReactionsController = class ReactionsController {
     reactionsService;
     constructor(reactionsService) {
         this.reactionsService = reactionsService;
     }
     async addReaction(messageId, emoji, user) {
-        return this.reactionsService.addReaction(messageId, emoji, user.id);
+        return this.reactionsService.addReaction(messageId, emoji, user);
     }
     async removeReaction(messageId, emoji, user) {
-        return this.reactionsService.removeReaction(messageId, emoji, user.id);
+        return this.reactionsService.removeReaction(messageId, emoji, user);
     }
 };
 exports.ReactionsController = ReactionsController;
@@ -49,6 +50,7 @@ __decorate([
 ], ReactionsController.prototype, "removeReaction", null);
 exports.ReactionsController = ReactionsController = __decorate([
     (0, common_1.Controller)('reactions'),
+    (0, common_1.UseGuards)(guards_1.MessageAccessGuard),
     __metadata("design:paramtypes", [reactions_service_1.ReactionsService])
 ], ReactionsController);
 //# sourceMappingURL=reactions.controller.js.map

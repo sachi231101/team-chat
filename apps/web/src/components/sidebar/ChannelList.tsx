@@ -5,14 +5,17 @@ import { useWorkspace } from '../../hooks';
 import { ChannelRow } from './ChannelRow';
 
 export const ChannelList: React.FC = () => {
-  const { setCreateChannelModalOpen, starredChannelIds } = useUiStore();
+  const { setCreateChannelModalOpen, starredChannelIds, customSections } = useUiStore();
   const { channels } = useWorkspace();
 
-  const unstarredChannels = channels.filter((c) => !starredChannelIds.includes(c.id));
+  const customSectionChannelIds = customSections.flatMap((s) => s.channelIds);
+  const unassignedChannels = channels.filter(
+    (c) => !starredChannelIds.includes(c.id) && !customSectionChannelIds.includes(c.id),
+  );
 
   return (
     <div className="space-y-px">
-      {unstarredChannels.map((channel) => (
+      {unassignedChannels.map((channel) => (
         <ChannelRow key={channel.id} channel={channel} />
       ))}
 

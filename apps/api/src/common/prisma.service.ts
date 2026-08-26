@@ -136,6 +136,16 @@ export class PrismaService
           statusMessage: 'Catch-up, search, and drafts — DM only',
           workplaceId: 'wp-teamchat-main',
         },
+        {
+          id: 'usr-agent-task',
+          name: 'TaskCoordinator',
+          email: 'task.coordinator@teamchat.ai',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          title: 'AI Task Coordinator',
+          status: UserStatus.ONLINE,
+          statusMessage: 'Turning discussions into actionable work 📋',
+          workplaceId: 'wp-teamchat-main',
+        },
       ];
 
       for (const u of usersData) {

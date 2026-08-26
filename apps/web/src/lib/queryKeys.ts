@@ -7,4 +7,6 @@ export const queryKeys = {
   savedMessages: ['saved-messages'] as const,
   messages: (type: string, id: string) => ['messages', type, id] as const,
   pinned: (type: string, id: string) => ['pinned', type, id] as const,
+  actions: (type: string, id: string) => ['actions', type, id] as const,
+  decisions: (type: string, id: string) => ['decisions', type, id] as const,
 };

@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { existsSync, readFileSync } from 'fs';
 import { basename, join } from 'path';
-import type { RequestUser } from '../common/request-user';
+import { RequestUser, normalizeUser } from '../common/request-user';
 import { PrismaService } from '../common/prisma.service';
 import { MessagesService } from '../chat/messages/messages.service';
 import { SearchService } from '../search/search.service';
@@ -17,6 +17,7 @@ export type Citation = {
   senderName: string;
   content: string;
   channelId?: string;
+  channelName?: string;
   conversationId?: string;
   createdAt: string;
 };
@@ -34,17 +35,23 @@ export class AiAssistantService {
     private readonly messages: MessagesService,
   ) {}
 
-  async ask(user: RequestUser, question: string, channelId?: string, conversationId?: string) {
-    const hits = await this.search.search(question, user.id, user.workplaceId);
+  async ask(
+    rawUser: RequestUser | { id?: string; userId?: string; workplaceId?: string },
+    question: string,
+    channelId?: string,
+    conversationId?: string,
+  ) {
+    const user = normalizeUser(rawUser);
+    const hits = await this.search.search(question, user.userId, user.workplaceId);
     const scoped = hits.messages.slice(0, 15);
     const retrieved = scoped
-      .map((m, i) => `[${i + 1}] ${m.senderName} (${m.createdAt}): ${m.content}`)
+      .map((m, i) => `[${i + 1}] #${(m as any).channelName || 'chat'} ${m.senderName} (${m.createdAt}): ${m.content}`)
       .join('\n');
 
     const extraContext =
       channelId || conversationId
         ? await this.context.buildTranscript({
-            userId: user.id,
+            userId: user.userId,
             channelId,
             conversationId,
           })
@@ -58,9 +65,9 @@ export class AiAssistantService {
       },
       {
         role: 'user',
-        content: `Question: ${question}\n\nRetrieved messages:\n${
+        content: `User question: ${question}\n\nRetrieved messages:\n${
           retrieved || '(none)'
-        }\n\n${extraContext ? `Additional local transcript:\n${extraContext}` : ''}`,
+        }${extraContext ? `\n\nRecent context in this view:\n${extraContext}` : ''}`,
       },
     ]);
 
@@ -72,26 +79,31 @@ export class AiAssistantService {
         senderName: m.senderName,
         content: m.content.slice(0, 240),
         channelId: m.channelId,
+        channelName: (m as any).channelName,
         conversationId: m.conversationId,
         createdAt: m.createdAt,
       })) as Citation[],
     };
   }
 
-  async summarize(user: RequestUser, body: {
-    window: SummarizeWindow;
-    channelId?: string;
-    conversationId?: string;
-    parentMessageId?: string;
-    postAsMessage?: boolean;
-    pin?: boolean;
-  }) {
+  async summarize(
+    rawUser: RequestUser | { id?: string; userId?: string; workplaceId?: string },
+    body: {
+      window: SummarizeWindow;
+      channelId?: string;
+      conversationId?: string;
+      parentMessageId?: string;
+      postAsMessage?: boolean;
+      pin?: boolean;
+    },
+  ) {
+    const user = normalizeUser(rawUser);
     if (!body.channelId && !body.conversationId && !body.parentMessageId) {
       throw new BadRequestException('channelId, conversationId, or parentMessageId is required');
     }
 
     const lines = await this.context.collectMessages({
-      userId: user.id,
+      userId: user.userId,
       channelId: body.channelId,
       conversationId: body.conversationId,
       parentMessageId: body.parentMessageId,
@@ -115,7 +127,7 @@ export class AiAssistantService {
 
     let postedMessageId: string | undefined;
     if (body.postAsMessage && (body.channelId || body.conversationId)) {
-      const posted = await this.messages.create(user.id, {
+      const posted = await this.messages.create(user, {
         content: `**Catch-up (${body.window})**\n\n${summary}`,
         channelId: body.channelId,
         conversationId: body.conversationId,
@@ -123,17 +135,18 @@ export class AiAssistantService {
       });
       postedMessageId = posted.id;
       if (body.pin) {
-        await this.messages.togglePin(posted.id);
+        await this.messages.togglePin(posted.id, user);
       }
     }
 
     return { summary, citations, postedMessageId };
   }
 
-  async recap(user: RequestUser) {
-    const person = await this.prisma.user.findUnique({ where: { id: user.id } });
+  async recap(rawUser: RequestUser | { id?: string; userId?: string; workplaceId?: string }) {
+    const user = normalizeUser(rawUser);
+    const person = await this.prisma.user.findUnique({ where: { id: user.userId } });
     const memberships = await this.prisma.channelMember.findMany({
-      where: { userId: user.id, channel: { workplaceId: user.workplaceId } },
+      where: { userId: user.userId, channel: { workplaceId: user.workplaceId } },
       select: { channelId: true },
     });
     const channelIds = memberships.map((m) => m.channelId);
@@ -159,7 +172,7 @@ export class AiAssistantService {
       },
       {
         role: 'user',
-        content: `Recap for ${person?.name || user.id}:\n${transcript || '(none)'}`,
+        content: `Daily recap for ${person?.name || 'teammate'}:\n\n${transcript || '(no messages in last 24h)'}`,
       },
     ]);
 

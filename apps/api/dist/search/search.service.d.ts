@@ -10,6 +10,7 @@ export declare class SearchService {
             senderName: string;
             senderAvatar: string | undefined;
             channelId: string | undefined;
+            channelName: any;
             conversationId: string | undefined;
             createdAt: string;
             reactions: never[];

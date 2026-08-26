@@ -21,13 +21,21 @@ import {
   X,
   FileText,
   Sparkles,
+  BarChart2,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
-import { useWorkspace, useChatMutations } from '../../../hooks';
+import { useWorkspace, useChatMutations, useActiveMessages } from '../../../hooks';
 import { socketService } from '../../../services';
+
 import { chatService } from '../../../services';
 import { Tooltip } from '../../../components/ui';
 import { MentionDropdown, MentionItem } from './MentionDropdown';
+import { SlashCommandDropdown, SlashCommandItem } from './SlashCommandDropdown';
+import { ChannelDropdown } from './ChannelDropdown';
+import { SmartRouteBadge } from './SmartRouteBadge';
+import { CreatePollModal } from './CreatePollModal';
+import { Channel } from '@team-chat/shared';
+
 import {
   getPlainText,
   getTextBeforeCaret,
@@ -83,16 +91,22 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [channelQuery, setChannelQuery] = useState<string | null>(null);
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
 
   const pickFiles = (accept: string) => {
+
     const input = fileInputRef.current;
     if (!input) return;
     input.accept = accept;
     input.click();
   };
 
-  const { activeId, activeType } = useUiStore();
+  const { activeId, activeType, setEditingMessageId } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
+  const { messages } = useActiveMessages();
   const { sendMessage } = useChatMutations();
 
   const sendTypingIndicator = (isTyping: boolean) => {
@@ -152,9 +166,33 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     refreshMarks();
 
     const before = getTextBeforeCaret(el);
+
+    // 1. @ for users
     const atMatch = before.match(/@([a-zA-Z0-9_-]*)$/);
-    if (atMatch) setMentionQuery(atMatch[1]);
-    else setMentionQuery(null);
+    if (atMatch) {
+      setMentionQuery(atMatch[1]);
+      setChannelQuery(null);
+      setSlashQuery(null);
+    } else {
+      setMentionQuery(null);
+
+      // 2. # for channels
+      const hashMatch = before.match(/#([a-zA-Z0-9_-]*)$/);
+      if (hashMatch) {
+        setChannelQuery(hashMatch[1]);
+        setSlashQuery(null);
+      } else {
+        setChannelQuery(null);
+
+        // 3. / for agents and slash commands (at start of line or after whitespace)
+        const slashMatch = before.match(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/);
+        if (slashMatch) {
+          setSlashQuery(slashMatch[1]);
+        } else {
+          setSlashQuery(null);
+        }
+      }
+    }
 
     if (text.trim()) {
       sendTypingIndicator(true);
@@ -173,16 +211,30 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   useEffect(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem(draftKey) || '' : '';
-    const el = editorRef.current;
-    if (el) {
-      el.innerHTML = saved ? markdownToHtml(saved) : '';
-      setPlain(getPlainText(el));
-    } else {
-      setPlain(saved);
+    if (editorRef.current) {
+      editorRef.current.focus();
     }
+  }, [activeId, activeType, parentMessageId]);
+
+  useEffect(() => {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(draftKey) || '' : '';
+    setPlain(raw);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = raw ? markdownToHtml(raw) : '';
+    }
+    setAttachedFiles([]);
     setMentionQuery(null);
+    setChannelQuery(null);
+    setSlashQuery(null);
+    setShowEmojiPicker(false);
+    setShowAiAssist(false);
   }, [draftKey]);
+
+  const isSelf =
+    activeType === 'conversation' &&
+    currentConversation &&
+    (currentConversation.participants.every((id) => id === currentUser.id) ||
+      otherUser?.id === currentUser.id);
 
   const placeholderText =
     placeholder ||
@@ -190,21 +242,19 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       ? 'Reply in thread...'
       : activeType === 'channel' && currentChannel
       ? `Message #${currentChannel.name}`
+      : isSelf
+      ? 'Jot something down'
       : otherUser
-      ? otherUser.id === currentUser.id
-        ? 'Jot something down'
-        : `Message ${otherUser.name}`
+      ? `Message ${otherUser.name}`
       : 'Type a message...');
 
   const canSend = (plain.trim().length > 0 || attachedFiles.length > 0) && !isUploading;
 
-  const handleFilesSelected = async (fileList: FileList | null) => {
-    const files = Array.from(fileList || []);
-    if (files.length === 0) return;
-
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
     setIsUploading(true);
     try {
-      for (const file of files) {
+      for (const file of Array.from(files)) {
         const uploaded = await chatService.uploadAttachment(file);
         setAttachedFiles((prev) => [...prev, uploaded]);
       }
@@ -215,6 +265,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
 
   const exec = (command: string, value?: string) => {
     editorRef.current?.focus();
@@ -273,6 +324,35 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       return;
     }
 
+    if (
+      e.key === 'ArrowUp' &&
+      isEditorEmpty(editorRef.current) &&
+      attachedFiles.length === 0 &&
+      mentionQuery === null &&
+      channelQuery === null &&
+      slashQuery === null
+    ) {
+      e.preventDefault();
+      const myLatest = [...messages].reverse().find(
+        (m) =>
+          m.senderId === currentUser.id &&
+          (parentMessageId ? m.parentMessageId === parentMessageId : !m.parentMessageId) &&
+          !m.deliveryStatus,
+      );
+      if (myLatest) {
+        setEditingMessageId(myLatest.id);
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      setMentionQuery(null);
+      setChannelQuery(null);
+      setSlashQuery(null);
+      setShowEmojiPicker(false);
+      setShowAiAssist(false);
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
       e.preventDefault();
       exec('bold');
@@ -314,6 +394,54 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     setMentionQuery(null);
     syncFromEditor();
   };
+
+  const handleSelectChannel = (channel: Channel) => {
+    const el = editorRef.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0) return;
+    el.focus();
+    const before = getTextBeforeCaret(el);
+    const match = before.match(/#([a-zA-Z0-9_-]*)$/);
+    const range = sel.getRangeAt(0);
+    if (match && range.startContainer.nodeType === Node.TEXT_NODE) {
+      const node = range.startContainer;
+      const end = range.startOffset;
+      const start = Math.max(0, end - match[0].length);
+      range.setStart(node, start);
+      range.deleteContents();
+    }
+    document.execCommand('insertText', false, `#${channel.name} `);
+    setChannelQuery(null);
+    syncFromEditor();
+  };
+
+  const handleSelectSlashCommand = (item: SlashCommandItem) => {
+    const el = editorRef.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0) return;
+    el.focus();
+    const before = getTextBeforeCaret(el);
+    const match = before.match(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/);
+    const range = sel.getRangeAt(0);
+    if (match && range.startContainer.nodeType === Node.TEXT_NODE) {
+      const node = range.startContainer;
+      const end = range.startOffset;
+      const matchText = match[0].trimStart();
+      const start = Math.max(0, end - matchText.length);
+      range.setStart(node, start);
+      range.deleteContents();
+    }
+    if (item.id === 'cmd-poll') {
+      setSlashQuery(null);
+      syncFromEditor();
+      setPollModalOpen(true);
+      return;
+    }
+    document.execCommand('insertText', false, `${item.command} `);
+    setSlashQuery(null);
+    syncFromEditor();
+  };
+
 
   const insertPlain = (value: string) => {
     editorRef.current?.focus();
@@ -372,6 +500,22 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           onClose={() => setMentionQuery(null)}
         />
       )}
+      {channelQuery !== null && (
+        <ChannelDropdown
+          query={channelQuery}
+          onSelect={handleSelectChannel}
+          onClose={() => setChannelQuery(null)}
+        />
+      )}
+      {slashQuery !== null && (
+        <SlashCommandDropdown
+          query={slashQuery}
+          onSelect={handleSelectSlashCommand}
+          onClose={() => setSlashQuery(null)}
+        />
+      )}
+
+      <SmartRouteBadge draftText={plain} onInsertText={(t) => insertPlain(t)} />
 
       <div
         className="overflow-hidden rounded-xl transition-all"
@@ -444,7 +588,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         <div className="relative">
           {empty && (
             <div
-              className="pointer-events-none absolute left-3 top-2.5 text-sm"
+              className="pointer-events-none absolute left-3 top-2.5 text-[15px]"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
               {placeholderText}
@@ -467,7 +611,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               document.execCommand('insertText', false, text);
               syncFromEditor();
             }}
-            className="composer-editor w-full min-h-[52px] max-h-[200px] overflow-y-auto bg-transparent px-3 py-2.5 text-sm leading-relaxed focus:outline-none"
+            className="composer-editor w-full min-h-[56px] max-h-[220px] overflow-y-auto bg-transparent px-3 py-2.5 text-[15px] leading-relaxed focus:outline-none"
             style={{ color: 'var(--color-text-primary)' }}
           />
         </div>
@@ -519,8 +663,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             </div>
             {fmtBtn(<Image className="h-4 w-4" />, 'Add image', () => pickFiles('image/*'))}
             {fmtBtn(<Mic className="h-4 w-4" />, 'Add audio', () => pickFiles('audio/*'))}
+            {fmtBtn(<BarChart2 className="h-4 w-4" />, 'Create poll', () => setPollModalOpen(true))}
             {fmtBtn(<Slash className="h-4 w-4" />, 'Slash commands', () => insertPlain('/'))}
           </div>
+
 
           {showEmoji && (
             <>
@@ -571,6 +717,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         </div>
       </div>
 
+      <CreatePollModal isOpen={pollModalOpen} onClose={() => setPollModalOpen(false)} />
+
       <style>{`
         .composer-editor strong, .composer-editor b { font-weight: 700; color: var(--color-text-primary); }
         .composer-editor em, .composer-editor i { font-style: italic; }
@@ -590,3 +738,4 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     </div>
   );
 };
+

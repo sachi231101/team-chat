@@ -36,6 +36,7 @@ __decorate([
     __metadata("design:type", String)
 ], AttachmentInputDto.prototype, "url", void 0);
 class CreateMessageDto {
+    clientMessageId;
     content;
     channelId;
     conversationId;
@@ -43,6 +44,11 @@ class CreateMessageDto {
     attachments;
 }
 exports.CreateMessageDto = CreateMessageDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateMessageDto.prototype, "clientMessageId", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),

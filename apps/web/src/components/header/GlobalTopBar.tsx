@@ -1,8 +1,9 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu, Bot, Sun, Users, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
+import { Tooltip } from '../ui';
 
 export const GlobalTopBar: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +12,10 @@ export const GlobalTopBar: React.FC = () => {
     toggleSidebar,
     navIndex,
     navStack,
+    aiPanelOpen,
+    toggleAiPanel,
+    setDailyBriefingOpen,
+    setMultiAgentStudioOpen,
   } = useUiStore();
   const { notifications } = useWorkspace();
   const unread = notifications.filter((n) => n.unread).length;
@@ -98,11 +103,60 @@ export const GlobalTopBar: React.FC = () => {
         </kbd>
       </button>
 
-      {/* Right: help + bell */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Right: AI Assistant + Daily Briefing + Swarm + Help + Bell */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Daily Briefing button */}
+        <Tooltip content="Personal Daily Briefing" side="bottom">
+          <button
+            type="button"
+            onClick={() => setDailyBriefingOpen(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 hover:scale-105 transition-all"
+            aria-label="Open Daily Briefing"
+          >
+            <Sun className="h-4 w-4 text-amber-400" />
+          </button>
+        </Tooltip>
+
+        {/* Multi-Agent Swarm Studio button */}
+        <Tooltip content="Multi-Agent Swarm Studio" side="bottom">
+          <button
+            type="button"
+            onClick={() => setMultiAgentStudioOpen(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 hover:bg-cyan-500/25 hover:scale-105 transition-all"
+            aria-label="Open Multi-Agent Studio"
+          >
+            <Users className="h-4 w-4 text-cyan-400" />
+          </button>
+        </Tooltip>
+
+        {/* AI Assistant button */}
+        <Tooltip content={aiPanelOpen ? "Close AI Assistant" : "Open AI Assistant"} side="bottom">
+          <button
+            type="button"
+            onClick={toggleAiPanel}
+            className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition-all ${
+              aiPanelOpen
+                ? 'ring-2 ring-violet-400 scale-105 shadow-md shadow-violet-500/25'
+                : 'hover:opacity-90 hover:scale-105'
+            }`}
+            style={{
+              background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)',
+              color: '#ffffff',
+            }}
+            aria-label="Toggle AI Assistant"
+          >
+            <Bot className="h-4 w-4 drop-shadow-sm" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+            </span>
+          </button>
+        </Tooltip>
+
         <button
           className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
           style={{ color: 'var(--color-text-secondary)' }}
+          aria-label="Help"
         >
           <HelpCircle className="h-4 w-4" />
         </button>
@@ -110,6 +164,7 @@ export const GlobalTopBar: React.FC = () => {
         <button
           className="relative flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-white/5"
           style={{ color: 'var(--color-text-secondary)' }}
+          aria-label="Notifications"
         >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
@@ -125,3 +180,4 @@ export const GlobalTopBar: React.FC = () => {
     </div>
   );
 };
+

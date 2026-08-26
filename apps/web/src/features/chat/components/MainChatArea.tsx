@@ -5,6 +5,8 @@ import { MessageComposer } from './MessageComposer';
 import { ChannelFilesPanel } from './ChannelFilesPanel';
 import { ChannelPinnedPanel } from './ChannelPinnedPanel';
 import { ChannelLinksPanel } from './ChannelLinksPanel';
+import { ChannelActionsPanel } from './ChannelActionsPanel';
+import { ChannelDecisionsPanel } from './ChannelDecisionsPanel';
 import { FilesView } from '../../files/components/FilesView';
 import { LaterView } from '../../later/components/LaterView';
 import { ActivityView } from '../../notifications/components/ActivityView';
@@ -40,6 +42,10 @@ export const MainChatArea: React.FC = () => {
         <ChannelPinnedPanel />
       ) : chatHeaderTab === 'links' ? (
         <ChannelLinksPanel />
+      ) : chatHeaderTab === 'actions' ? (
+        <ChannelActionsPanel />
+      ) : chatHeaderTab === 'decisions' ? (
+        <ChannelDecisionsPanel />
       ) : (
         <>
           <MessageTimeline />

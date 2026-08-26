@@ -25,7 +25,7 @@ let ChannelsController = class ChannelsController {
         this.channelsService = channelsService;
     }
     findAll(user) {
-        return this.channelsService.findAll(user.workplaceId, user.id);
+        return this.channelsService.findAll(user.workplaceId, user.userId);
     }
     findOne(id, user) {
         return this.channelsService.findOne(id, user.workplaceId);
@@ -33,18 +33,18 @@ let ChannelsController = class ChannelsController {
     create(user, body) {
         return this.channelsService.create({
             ...body,
-            createdById: user.id,
+            createdById: user.userId,
             workplaceId: user.workplaceId,
         });
     }
-    getMembers(id) {
-        return this.channelsService.getMembers(id);
+    getMembers(id, user) {
+        return this.channelsService.getMembers(id, user);
     }
-    addMembers(id, body) {
-        return this.channelsService.addMembers(id, body.userIds);
+    addMembers(id, body, user) {
+        return this.channelsService.addMembers(id, body.userIds, user);
     }
-    removeMember(id, userId) {
-        return this.channelsService.removeMember(id, userId);
+    removeMember(id, userId, user) {
+        return this.channelsService.removeMember(id, userId, user);
     }
 };
 exports.ChannelsController = ChannelsController;
@@ -76,8 +76,9 @@ __decorate([
     (0, common_1.Get)(':id/members'),
     (0, common_1.UseGuards)(guards_1.ChannelMemberGuard),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], ChannelsController.prototype, "getMembers", null);
 __decorate([
@@ -85,8 +86,9 @@ __decorate([
     (0, common_1.UseGuards)(guards_1.ChannelMemberGuard),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, add_member_dto_1.AddChannelMembersDto]),
+    __metadata("design:paramtypes", [String, add_member_dto_1.AddChannelMembersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ChannelsController.prototype, "addMembers", null);
 __decorate([
@@ -94,8 +96,9 @@ __decorate([
     (0, common_1.UseGuards)(guards_1.ChannelMemberGuard),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('userId')),
+    __param(2, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
 ], ChannelsController.prototype, "removeMember", null);
 exports.ChannelsController = ChannelsController = __decorate([

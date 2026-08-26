@@ -26,8 +26,14 @@ export const MessageTimeline: React.FC = () => {
             u.id ===
             (currentConversation.participants.find((id) => id !== currentUser.id) ||
               currentConversation.participants[0]),
-        )
+        ) || currentUser
       : null;
+
+  const isSelfConvo =
+    activeType === 'conversation' &&
+    currentConversation &&
+    (currentConversation.participants.every((id) => id === currentUser.id) ||
+      otherUser?.id === currentUser.id);
 
   // Only non-reply messages for the active context
   const currentMessages = messages.filter((m) => !m.parentMessageId);
@@ -129,6 +135,41 @@ export const MessageTimeline: React.FC = () => {
               {currentChannel.description || 'Use this channel to collaborate, share updates, and keep the team in sync.'}
             </p>
           </div>
+        ) : isSelfConvo ? (
+          <div className="space-y-3 pt-2">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl font-bold text-white shadow-md"
+              style={{ background: '#9333ea' }}
+            >
+              {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div className="flex items-center gap-2">
+              <h1
+                className="text-2xl font-extrabold tracking-tight"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                {currentUser.name} (you)
+              </h1>
+              <span className="h-3 w-3 rounded-full bg-emerald-500 inline-block shadow-sm" />
+            </div>
+            <p className="text-sm max-w-2xl leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+              This is your space. Draft messages, list your to-dos, or keep links and files handy. You can also talk to yourself here, but please bear in mind you'll have to supply both sides of the conversation.
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => useUiStore.getState().setProfileModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg border text-xs font-semibold hover-surface transition-all"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  background: 'var(--color-elevated)',
+                }}
+              >
+                Edit Profile
+              </button>
+            </div>
+          </div>
         ) : otherUser ? (
           <div className="space-y-2">
             <div
@@ -144,17 +185,11 @@ export const MessageTimeline: React.FC = () => {
               className="text-2xl font-extrabold tracking-tight"
               style={{ color: 'var(--color-text-primary)' }}
             >
-              {otherUser.id === currentUser.id ? `${otherUser.name} (you)` : otherUser.name}
+              {otherUser.name}
             </h1>
             <p className="text-sm max-w-xl leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              {otherUser.id === currentUser.id
-                ? 'This is your space for notes, drafts, and anything you want to keep handy. Only you can see these messages.'
-                : (
-                  <>
-                    This is the very beginning of your direct message history with{' '}
-                    <strong style={{ color: 'var(--color-text-primary)' }}>{otherUser.name}</strong>. Messages here are private between the two of you.
-                  </>
-                )}
+              This is the very beginning of your direct message history with{' '}
+              <strong style={{ color: 'var(--color-text-primary)' }}>{otherUser.name}</strong>. Messages here are private between the two of you.
             </p>
           </div>
         ) : null}

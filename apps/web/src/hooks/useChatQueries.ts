@@ -1,9 +1,19 @@
 import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Message, User, Channel } from '@team-chat/shared';
+import {
+  Message,
+  User,
+  Channel,
+  ActionItem,
+  CreateActionItemDto,
+  UpdateActionItemDto,
+  MessageTagType,
+} from '@team-chat/shared';
 import { chatService } from '../services';
 import { queryKeys } from '../lib/queryKeys';
+export { queryKeys };
 import { DEFAULT_CURRENT_USER, getStoredUserId, setStoredUserId } from '../lib/currentUser';
+
 import { useUiStore } from '../stores';
 
 export function useUsersQuery() {
@@ -59,6 +69,36 @@ export function useContextPinnedMessagesQuery() {
         activeType === 'channel' ? activeId : undefined,
         activeType === 'conversation' ? activeId : undefined,
       ),
+    enabled: Boolean(activeId),
+  });
+}
+
+export function useContextActionsQuery(status?: string) {
+  const activeId = useUiStore((s) => s.activeId);
+  const activeType = useUiStore((s) => s.activeType);
+
+  return useQuery({
+    queryKey: [...queryKeys.actions(activeType, activeId), status ?? 'ALL'],
+    queryFn: () =>
+      chatService.getActionItems({
+        channelId: activeType === 'channel' ? activeId : undefined,
+        status: status && status !== 'ALL' ? status : undefined,
+      }),
+    enabled: Boolean(activeId),
+  });
+}
+
+export function useContextDecisionsQuery() {
+  const activeId = useUiStore((s) => s.activeId);
+  const activeType = useUiStore((s) => s.activeType);
+
+  return useQuery({
+    queryKey: queryKeys.decisions(activeType, activeId),
+    queryFn: () =>
+      chatService.getDecisions({
+        channelId: activeType === 'channel' ? activeId : undefined,
+        conversationId: activeType === 'conversation' ? activeId : undefined,
+      }),
     enabled: Boolean(activeId),
   });
 }
@@ -124,10 +164,49 @@ export function useMessagesQuery() {
 
 export function useActiveMessages() {
   const query = useMessagesQuery();
-  const messages = query.data
+  const outbox = useUiStore((s) => s.outbox);
+  const activeId = useUiStore((s) => s.activeId);
+  const activeType = useUiStore((s) => s.activeType);
+
+  const fetchedMessages = query.data
     ? [...query.data.pages].reverse().flatMap((page) => page.items)
     : [];
+
+  // Merge pending outbox items for optimistic UI
+  const pendingOutbox = outbox
+    .filter((o) =>
+      activeType === 'channel'
+        ? o.channelId === activeId
+        : o.conversationId === activeId,
+    )
+    .filter((o) => !fetchedMessages.some((m) => m.clientMessageId === o.clientMessageId));
+
+  const optimisticMessages: Message[] = pendingOutbox.map((o) => ({
+    id: o.clientMessageId,
+    clientMessageId: o.clientMessageId,
+    content: o.content,
+    senderId: getStoredUserId(),
+    senderName: 'You',
+    channelId: o.channelId,
+    conversationId: o.conversationId,
+    parentMessageId: o.parentMessageId,
+    reactions: [],
+    attachments: o.attachments?.map((a, i) => ({
+      id: `att-pending-${i}`,
+      name: a.name,
+      size: a.size,
+      type: a.type,
+      url: a.url,
+      createdAt: o.createdAt,
+    })),
+    deliveryStatus: o.status,
+    createdAt: o.createdAt,
+    updatedAt: o.createdAt,
+  }));
+
+  const messages = [...fetchedMessages, ...optimisticMessages];
   const lastReadMessageId = query.data?.pages[0]?.lastReadMessageId ?? null;
+
   return {
     ...query,
     messages,
@@ -137,8 +216,18 @@ export function useActiveMessages() {
 
 export function useChatMutations() {
   const queryClient = useQueryClient();
-  const { activeId, activeType, setError, setActiveChannel, setActiveConversation, setCreateChannelModalOpen, setPeopleModalOpen } =
-    useUiStore();
+  const {
+    activeId,
+    activeType,
+    setError,
+    setActiveChannel,
+    setActiveConversation,
+    setCreateChannelModalOpen,
+    setPeopleModalOpen,
+    addOutboxItem,
+    updateOutboxItem,
+    removeOutboxItem,
+  } = useUiStore();
 
   const invalidateMessages = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.messages(activeType, activeId) });
@@ -146,18 +235,42 @@ export function useChatMutations() {
 
   return {
     sendMessage: useMutation({
-      mutationFn: (input: {
+      mutationFn: async (input: {
         content: string;
         attachments?: { name: string; url: string; size: number; type: string }[];
         parentMessageId?: string;
-      }) =>
-        chatService.sendMessage({
+        clientMessageId?: string;
+      }) => {
+        const clientMessageId = input.clientMessageId || `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const outboxEntry = {
+          clientMessageId,
           content: input.content,
-          attachments: input.attachments,
-          parentMessageId: input.parentMessageId,
           channelId: activeType === 'channel' ? activeId : undefined,
           conversationId: activeType === 'conversation' ? activeId : undefined,
-        }),
+          parentMessageId: input.parentMessageId,
+          attachments: input.attachments,
+          status: 'sending' as const,
+          createdAt: new Date().toISOString(),
+        };
+
+        addOutboxItem(outboxEntry);
+
+        try {
+          const res = await chatService.sendMessage({
+            clientMessageId,
+            content: input.content,
+            attachments: input.attachments,
+            parentMessageId: input.parentMessageId,
+            channelId: activeType === 'channel' ? activeId : undefined,
+            conversationId: activeType === 'conversation' ? activeId : undefined,
+          });
+          removeOutboxItem(clientMessageId);
+          return res;
+        } catch (err: any) {
+          updateOutboxItem(clientMessageId, 'failed', err.message);
+          throw err;
+        }
+      },
       onSuccess: () => {
         invalidateMessages();
         void queryClient.invalidateQueries({ queryKey: ['message-replies'] });
@@ -287,5 +400,43 @@ export function useChatMutations() {
       setStoredUserId(user.id);
       void queryClient.invalidateQueries();
     },
+
+    // Action Items Mutations (Pillar 5)
+    createActionItem: useMutation({
+      mutationFn: (data: CreateActionItemDto) => chatService.createActionItem(data),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['actions'] });
+        invalidateMessages();
+      },
+      onError: (err: Error) => setError(err.message),
+    }),
+    updateActionItem: useMutation({
+      mutationFn: ({ id, data }: { id: string; data: UpdateActionItemDto }) =>
+        chatService.updateActionItem(id, data),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['actions'] });
+        invalidateMessages();
+      },
+      onError: (err: Error) => setError(err.message),
+    }),
+    deleteActionItem: useMutation({
+      mutationFn: (id: string) => chatService.deleteActionItem(id),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['actions'] });
+        invalidateMessages();
+      },
+      onError: (err: Error) => setError(err.message),
+    }),
+
+    // Context & Decision Tagging Mutations (Pillar 4)
+    toggleMessageTag: useMutation({
+      mutationFn: ({ messageId, tag, note }: { messageId: string; tag: MessageTagType; note?: string }) =>
+        chatService.toggleMessageTag(messageId, { tag, note }),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['decisions'] });
+        invalidateMessages();
+      },
+      onError: (err: Error) => setError(err.message),
+    }),
   };
 }

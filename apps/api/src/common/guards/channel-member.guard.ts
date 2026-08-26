@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders } from '../request-user';
+import { readUserFromHeaders, RequestUser } from '../request-user';
 
 @Injectable()
 export class ChannelMemberGuard implements CanActivate {
@@ -14,7 +14,8 @@ export class ChannelMemberGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const { id: userId } = readUserFromHeaders(req.headers);
+    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
+    req.user = user;
 
     const channelId =
       req.params?.channelId ||
@@ -27,7 +28,7 @@ export class ChannelMemberGuard implements CanActivate {
     }
 
     try {
-      await this.chatAccess.assertChannelAccess(userId, channelId);
+      await this.chatAccess.assertChannelAccess(user, channelId);
       return true;
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
@@ -37,3 +38,4 @@ export class ChannelMemberGuard implements CanActivate {
     }
   }
 }
+

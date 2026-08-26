@@ -1,14 +1,36 @@
 import { create } from 'zustand';
+import { Message } from '@team-chat/shared';
 
 export type RailTab = 'home' | 'dms' | 'activity' | 'files' | 'later';
 export type ActiveType = 'channel' | 'conversation';
-export type DetailsTab = 'about' | 'members' | 'files' | 'pinned' | 'links';
-export type ChatHeaderTab = 'messages' | 'files' | 'pinned' | 'links';
+export type DetailsTab = 'about' | 'members' | 'files' | 'pinned' | 'links' | 'actions' | 'decisions';
+export type ChatHeaderTab = 'messages' | 'files' | 'pinned' | 'links' | 'actions' | 'decisions';
 
 export type NavEntry = { type: ActiveType; id: string };
 
+export interface OutboxItem {
+  clientMessageId: string;
+  content: string;
+  channelId?: string;
+  conversationId?: string;
+  parentMessageId?: string;
+  attachments?: { name: string; url: string; size: number; type: string }[];
+  status: 'sending' | 'sent' | 'failed';
+  error?: string;
+  createdAt: string;
+}
+
+export interface CustomSidebarSection {
+  id: string;
+  name: string;
+  icon?: string;
+  channelIds: string[];
+  isCollapsed?: boolean;
+}
+
 const STARRED_CHANNELS_KEY = 'team_chat_starred_channels';
 const THEME_KEY = 'team_chat_theme';
+const CUSTOM_SECTIONS_KEY = 'team_chat_custom_sections';
 
 export type AppTheme = 'dark' | 'slate' | 'light';
 
@@ -45,6 +67,21 @@ function saveStarredChannelIds(ids: string[]) {
   localStorage.setItem(STARRED_CHANNELS_KEY, JSON.stringify(ids));
 }
 
+function loadCustomSections(): CustomSidebarSection[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_SECTIONS_KEY);
+    return raw ? (JSON.parse(raw) as CustomSidebarSection[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomSections(sections: CustomSidebarSection[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(CUSTOM_SECTIONS_KEY, JSON.stringify(sections));
+}
+
 interface UiState {
   error: string | null;
   setError: (error: string | null) => void;
@@ -74,6 +111,19 @@ interface UiState {
   toggleStarChannel: (channelId: string) => void;
   pruneStarredChannels: (validChannelIds: string[]) => void;
 
+  // Custom Sidebar Channel Sections
+  customSections: CustomSidebarSection[];
+  createCustomSection: (name: string, icon?: string) => string;
+  updateCustomSection: (id: string, data: Partial<CustomSidebarSection>) => void;
+  deleteCustomSection: (id: string) => void;
+  addChannelToCustomSection: (sectionId: string, channelId: string) => void;
+  removeChannelFromCustomSection: (sectionId: string, channelId: string) => void;
+  toggleCustomSectionCollapse: (sectionId: string) => void;
+  createSectionModalOpen: boolean;
+  setCreateSectionModalOpen: (open: boolean) => void;
+  targetSectionForNewChannel: string | null;
+  setTargetSectionForNewChannel: (sectionId: string | null) => void;
+
   typingUsers: { userId: string; userName: string; channelId?: string; conversationId?: string }[];
   addTypingUser: (data: UiState['typingUsers'][number]) => void;
   removeTypingUser: (userId: string) => void;
@@ -83,27 +133,79 @@ interface UiState {
   closeThread: () => void;
   focusMessageId: string | null;
   setFocusMessageId: (messageId: string | null) => void;
+  editingMessageId: string | null;
+  setEditingMessageId: (messageId: string | null) => void;
   jumpToMessage: (opts: { messageId: string; channelId?: string; conversationId?: string }) => void;
+
 
   detailsPanelOpen: boolean;
   detailsTab: DetailsTab;
   toggleDetailsPanel: () => void;
   setDetailsTab: (tab: DetailsTab) => void;
 
+  aiPanelOpen: boolean;
+  setAiPanelOpen: (open: boolean) => void;
+  toggleAiPanel: () => void;
+
+  // Modals & Panels
   searchModalOpen: boolean;
   setSearchModalOpen: (open: boolean) => void;
   createChannelModalOpen: boolean;
   setCreateChannelModalOpen: (open: boolean) => void;
-  inviteModalOpen: boolean;
-  setInviteModalOpen: (open: boolean) => void;
   profileModalOpen: boolean;
   setProfileModalOpen: (open: boolean) => void;
   settingsModalOpen: boolean;
   setSettingsModalOpen: (open: boolean) => void;
   peopleModalOpen: boolean;
   setPeopleModalOpen: (open: boolean) => void;
-  huddleNotesModalOpen: boolean;
-  setHuddleNotesModalOpen: (open: boolean) => void;
+  inviteModalOpen: boolean;
+  setInviteModalOpen: (open: boolean) => void;
+  // AI Advantages Modals & Workflows
+  dailyBriefingOpen: boolean;
+  setDailyBriefingOpen: (open: boolean) => void;
+  extractWorkModalOpen: boolean;
+  setExtractWorkModalOpen: (open: boolean) => void;
+  extractWorkTarget: {
+    channelId?: string;
+    conversationId?: string;
+    parentMessageId?: string;
+    messageId?: string;
+    transcript?: string;
+  } | null;
+  setExtractWorkTarget: (target: UiState['extractWorkTarget']) => void;
+  openExtractWorkForTarget: (target: NonNullable<UiState['extractWorkTarget']>) => void;
+  multiAgentStudioOpen: boolean;
+  setMultiAgentStudioOpen: (open: boolean) => void;
+  aiLearningModalOpen: boolean;
+  setAiLearningModalOpen: (open: boolean) => void;
+  recordDecisionModalOpen: boolean;
+  setRecordDecisionModalOpen: (open: boolean) => void;
+  decisionTarget: {
+    channelId?: string;
+    messageId?: string;
+    title?: string;
+    rationale?: string;
+  } | null;
+  setDecisionTarget: (target: UiState['decisionTarget']) => void;
+  openRecordDecision: (target?: UiState['decisionTarget']) => void;
+
+  // Action Management & Context
+  createActionModalOpen: boolean;
+  setCreateActionModalOpen: (open: boolean) => void;
+  actionTargetMessage: Message | null;
+  setActionTargetMessage: (msg: Message | null) => void;
+  openCreateActionForMessage: (msg: Message) => void;
+
+  // Reliable Messaging Outbox
+  outbox: OutboxItem[];
+  addOutboxItem: (item: OutboxItem) => void;
+  updateOutboxItem: (clientMessageId: string, status: 'sending' | 'sent' | 'failed', error?: string) => void;
+  removeOutboxItem: (clientMessageId: string) => void;
+
+  // Focus & DND
+  dndEnabled: boolean;
+  dndUntil: string | null;
+  setDnd: (enabled: boolean, until?: string | null) => void;
 
   theme: AppTheme;
   setTheme: (theme: AppTheme) => void;
@@ -198,6 +300,78 @@ export const useUiStore = create<UiState>((set, get) => ({
       return { starredChannelIds: next };
     }),
 
+  // Custom Sidebar Channel Sections Implementation
+  customSections: loadCustomSections(),
+  createSectionModalOpen: false,
+  setCreateSectionModalOpen: (createSectionModalOpen) => set({ createSectionModalOpen }),
+  targetSectionForNewChannel: null,
+  setTargetSectionForNewChannel: (targetSectionForNewChannel) => set({ targetSectionForNewChannel }),
+
+  createCustomSection: (name: string, icon?: string) => {
+    const newSection: CustomSidebarSection = {
+      id: `sec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: name.trim(),
+      icon: icon || 'folder',
+      channelIds: [],
+      isCollapsed: false,
+    };
+    set((state) => {
+      const next = [...state.customSections, newSection];
+      saveCustomSections(next);
+      return { customSections: next };
+    });
+    return newSection.id;
+  },
+
+  updateCustomSection: (id, data) =>
+    set((state) => {
+      const next = state.customSections.map((s) => (s.id === id ? { ...s, ...data } : s));
+      saveCustomSections(next);
+      return { customSections: next };
+    }),
+
+  deleteCustomSection: (id) =>
+    set((state) => {
+      const next = state.customSections.filter((s) => s.id !== id);
+      saveCustomSections(next);
+      return { customSections: next };
+    }),
+
+  addChannelToCustomSection: (sectionId, channelId) =>
+    set((state) => {
+      const next = state.customSections.map((s) => {
+        if (s.id === sectionId) {
+          if (s.channelIds.includes(channelId)) return s;
+          return { ...s, channelIds: [...s.channelIds, channelId] };
+        }
+        // Remove from other custom sections if any to avoid duplication
+        return { ...s, channelIds: s.channelIds.filter((cId) => cId !== channelId) };
+      });
+      saveCustomSections(next);
+      return { customSections: next };
+    }),
+
+  removeChannelFromCustomSection: (sectionId, channelId) =>
+    set((state) => {
+      const next = state.customSections.map((s) => {
+        if (s.id === sectionId) {
+          return { ...s, channelIds: s.channelIds.filter((cId) => cId !== channelId) };
+        }
+        return s;
+      });
+      saveCustomSections(next);
+      return { customSections: next };
+    }),
+
+  toggleCustomSectionCollapse: (sectionId) =>
+    set((state) => {
+      const next = state.customSections.map((s) =>
+        s.id === sectionId ? { ...s, isCollapsed: !s.isCollapsed } : s,
+      );
+      saveCustomSections(next);
+      return { customSections: next };
+    }),
+
   typingUsers: [],
   addTypingUser: (data) =>
     set((state) => {
@@ -214,16 +388,23 @@ export const useUiStore = create<UiState>((set, get) => ({
   closeThread: () => set({ activeThreadId: null }),
   focusMessageId: null,
   setFocusMessageId: (focusMessageId) => set({ focusMessageId }),
+  editingMessageId: null,
+  setEditingMessageId: (editingMessageId) => set({ editingMessageId }),
   jumpToMessage: ({ messageId, channelId, conversationId }) => {
+
     if (channelId) get().setActiveChannel(channelId);
     else if (conversationId) get().setActiveConversation(conversationId);
     get().openThread(messageId);
     set({ focusMessageId: messageId, searchModalOpen: false, activeRailTab: channelId ? 'home' : 'dms' });
   },
 
-  detailsPanelOpen: true,
+  detailsPanelOpen: false,
   detailsTab: 'about',
-  toggleDetailsPanel: () => set((s) => ({ detailsPanelOpen: !s.detailsPanelOpen })),
+  toggleDetailsPanel: () =>
+    set((s) => ({
+      detailsPanelOpen: !s.detailsPanelOpen,
+      aiPanelOpen: !s.detailsPanelOpen ? false : s.aiPanelOpen,
+    })),
   setDetailsTab: (detailsTab) => {
     const tabMap: Record<DetailsTab, ChatHeaderTab> = {
       about: 'messages',
@@ -231,24 +412,91 @@ export const useUiStore = create<UiState>((set, get) => ({
       files: 'files',
       pinned: 'pinned',
       links: 'links',
+      actions: 'actions',
+      decisions: 'decisions',
     };
-    set({ detailsTab, detailsPanelOpen: true, chatHeaderTab: tabMap[detailsTab] });
+    set({
+      detailsTab,
+      detailsPanelOpen: true,
+      aiPanelOpen: false,
+      chatHeaderTab: tabMap[detailsTab],
+    });
   },
+
+  aiPanelOpen: false,
+  setAiPanelOpen: (aiPanelOpen) =>
+    set((s) => ({
+      aiPanelOpen,
+      detailsPanelOpen: aiPanelOpen ? false : s.detailsPanelOpen,
+    })),
+  toggleAiPanel: () =>
+    set((s) => ({
+      aiPanelOpen: !s.aiPanelOpen,
+      detailsPanelOpen: !s.aiPanelOpen ? false : s.detailsPanelOpen,
+    })),
 
   searchModalOpen: false,
   setSearchModalOpen: (searchModalOpen) => set({ searchModalOpen }),
   createChannelModalOpen: false,
   setCreateChannelModalOpen: (createChannelModalOpen) => set({ createChannelModalOpen }),
-  inviteModalOpen: false,
-  setInviteModalOpen: (inviteModalOpen) => set({ inviteModalOpen }),
   profileModalOpen: false,
   setProfileModalOpen: (profileModalOpen) => set({ profileModalOpen }),
   settingsModalOpen: false,
   setSettingsModalOpen: (settingsModalOpen) => set({ settingsModalOpen }),
   peopleModalOpen: false,
   setPeopleModalOpen: (peopleModalOpen) => set({ peopleModalOpen }),
-  huddleNotesModalOpen: false,
-  setHuddleNotesModalOpen: (huddleNotesModalOpen) => set({ huddleNotesModalOpen }),
+  inviteModalOpen: false,
+  setInviteModalOpen: (inviteModalOpen) => set({ inviteModalOpen }),
+
+  // AI Advantages Modals & Workflows
+  dailyBriefingOpen: false,
+  setDailyBriefingOpen: (dailyBriefingOpen) => set({ dailyBriefingOpen }),
+  extractWorkModalOpen: false,
+  setExtractWorkModalOpen: (extractWorkModalOpen) => set({ extractWorkModalOpen }),
+  extractWorkTarget: null,
+  setExtractWorkTarget: (extractWorkTarget) => set({ extractWorkTarget }),
+  openExtractWorkForTarget: (target) =>
+    set({ extractWorkTarget: target, extractWorkModalOpen: true }),
+  multiAgentStudioOpen: false,
+  setMultiAgentStudioOpen: (multiAgentStudioOpen) => set({ multiAgentStudioOpen }),
+  aiLearningModalOpen: false,
+  setAiLearningModalOpen: (aiLearningModalOpen) => set({ aiLearningModalOpen }),
+  recordDecisionModalOpen: false,
+  setRecordDecisionModalOpen: (recordDecisionModalOpen) => set({ recordDecisionModalOpen }),
+  decisionTarget: null,
+  setDecisionTarget: (decisionTarget) => set({ decisionTarget }),
+  openRecordDecision: (target) =>
+    set({ decisionTarget: target || null, recordDecisionModalOpen: true }),
+
+  // Action Management
+  createActionModalOpen: false,
+  setCreateActionModalOpen: (createActionModalOpen) => set({ createActionModalOpen }),
+  actionTargetMessage: null,
+  setActionTargetMessage: (actionTargetMessage) => set({ actionTargetMessage }),
+  openCreateActionForMessage: (msg) =>
+    set({ actionTargetMessage: msg, createActionModalOpen: true }),
+
+  // Outbox
+  outbox: [],
+  addOutboxItem: (item) =>
+    set((state) => ({
+      outbox: [...state.outbox.filter((o) => o.clientMessageId !== item.clientMessageId), item],
+    })),
+  updateOutboxItem: (clientMessageId, status, error) =>
+    set((state) => ({
+      outbox: state.outbox.map((o) =>
+        o.clientMessageId === clientMessageId ? { ...o, status, error } : o,
+      ),
+    })),
+  removeOutboxItem: (clientMessageId) =>
+    set((state) => ({
+      outbox: state.outbox.filter((o) => o.clientMessageId !== clientMessageId),
+    })),
+
+  // Focus / DND
+  dndEnabled: false,
+  dndUntil: null,
+  setDnd: (dndEnabled, dndUntil = null) => set({ dndEnabled, dndUntil }),
 
   theme: loadTheme(),
   setTheme: (theme) => {

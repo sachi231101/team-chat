@@ -20,7 +20,7 @@ export class ChannelsController {
 
   @Get()
   findAll(@CurrentUser() user: RequestUser) {
-    return this.channelsService.findAll(user.workplaceId, user.id);
+    return this.channelsService.findAll(user.workplaceId, user.userId);
   }
 
   @Get(':id')
@@ -33,15 +33,15 @@ export class ChannelsController {
   create(@CurrentUser() user: RequestUser, @Body() body: CreateChannelDto) {
     return this.channelsService.create({
       ...body,
-      createdById: user.id,
+      createdById: user.userId,
       workplaceId: user.workplaceId,
     });
   }
 
   @Get(':id/members')
   @UseGuards(ChannelMemberGuard)
-  getMembers(@Param('id') id: string) {
-    return this.channelsService.getMembers(id);
+  getMembers(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.channelsService.getMembers(id, user);
   }
 
   @Post(':id/members')
@@ -49,8 +49,9 @@ export class ChannelsController {
   addMembers(
     @Param('id') id: string,
     @Body() body: AddChannelMembersDto,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.channelsService.addMembers(id, body.userIds);
+    return this.channelsService.addMembers(id, body.userIds, user);
   }
 
   @Delete(':id/members/:userId')
@@ -58,7 +59,9 @@ export class ChannelsController {
   removeMember(
     @Param('id') id: string,
     @Param('userId') userId: string,
+    @CurrentUser() user: RequestUser,
   ) {
-    return this.channelsService.removeMember(id, userId);
+    return this.channelsService.removeMember(id, userId, user);
   }
 }
+

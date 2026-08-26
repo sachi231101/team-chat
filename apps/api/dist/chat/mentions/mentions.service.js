@@ -28,13 +28,42 @@ let MentionsService = class MentionsService {
         return names;
     }
     async notifyFromMessage(message) {
+        let workplaceId = 'wp-teamchat-main';
+        let allowedUserIds = new Set();
+        if (message.channelId) {
+            const channel = await this.prisma.channel.findUnique({
+                where: { id: message.channelId },
+                include: { members: true },
+            });
+            if (!channel)
+                return;
+            workplaceId = channel.workplaceId;
+            if (channel.type === client_1.ChannelType.PRIVATE) {
+                allowedUserIds = new Set(channel.members.map((m) => m.userId));
+            }
+        }
+        else if (message.conversationId) {
+            const conversation = await this.prisma.conversation.findUnique({
+                where: { id: message.conversationId },
+                include: { participants: true },
+            });
+            if (!conversation)
+                return;
+            workplaceId = conversation.workplaceId;
+            allowedUserIds = new Set(conversation.participants.map((p) => p.userId));
+        }
         const names = this.extractMentions(message.content);
-        const users = await this.prisma.user.findMany();
+        const users = await this.prisma.user.findMany({
+            where: { workplaceId },
+        });
         const byName = new Map(users.map((u) => [u.name.toLowerCase(), u]));
         const mentioned = new Set();
         for (const name of names) {
             const user = byName.get(name.toLowerCase());
-            if (user && user.id !== message.senderId) {
+            if (user && user.id !== message.senderId && !user.id.startsWith('usr-agent-')) {
+                if (allowedUserIds.size > 0 && !allowedUserIds.has(user.id)) {
+                    continue;
+                }
                 mentioned.add(user.id);
             }
         }
@@ -55,7 +84,10 @@ let MentionsService = class MentionsService {
             const parent = await this.prisma.message.findUnique({
                 where: { id: message.parentMessageId },
             });
-            if (parent && parent.senderId !== message.senderId && !mentioned.has(parent.senderId)) {
+            if (parent &&
+                parent.senderId !== message.senderId &&
+                !mentioned.has(parent.senderId) &&
+                (allowedUserIds.size === 0 || allowedUserIds.has(parent.senderId))) {
                 await this.prisma.notification.create({
                     data: {
                         userId: parent.senderId,

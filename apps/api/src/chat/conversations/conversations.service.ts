@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { ChatAccessService } from '../../common/chat-access.service';
 import { Conversation } from '@team-chat/shared';
 
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chatAccess: ChatAccessService,
+  ) {}
 
   async findAll(workplaceId: string = 'wp-teamchat-main', userId?: string): Promise<Conversation[]> {
     try {
@@ -68,6 +72,8 @@ export class ConversationsService {
     const uniqueParticipants = Array.from(new Set(data.participants));
 
     try {
+      await this.chatAccess.assertUsersBelongToWorkplace(wpId, uniqueParticipants);
+
       const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
       if (existing) return existing;
 
@@ -92,6 +98,7 @@ export class ConversationsService {
         updatedAt: c.updatedAt.toISOString(),
       };
     } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) throw error;
       throw new InternalServerErrorException(
         `Failed to create conversation: ${(error as Error).message}`,
       );
@@ -128,3 +135,4 @@ export class ConversationsService {
     };
   }
 }
+

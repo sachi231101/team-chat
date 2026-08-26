@@ -6,6 +6,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters';
 import { UPLOAD_DIR } from './attachments/attachments.service';
+import { RedisIoAdapter } from './realtime/redis-io.adapter';
 
 function allowedOrigins(): (string | RegExp)[] {
   const raw = process.env.ALLOWED_ORIGINS || '';
@@ -18,6 +19,10 @@ function allowedOrigins(): (string | RegExp)[] {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   if (!existsSync(UPLOAD_DIR)) {
     mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -66,3 +71,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
