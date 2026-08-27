@@ -21,8 +21,12 @@ let SearchController = class SearchController {
     constructor(searchService) {
         this.searchService = searchService;
     }
-    async search(user, q) {
-        return this.searchService.search(q, user.userId, user.workplaceId);
+    async search(user, q, scope) {
+        const allowed = ['all', 'channels', 'people', 'messages'];
+        const resolved = allowed.includes(scope)
+            ? scope
+            : 'all';
+        return this.searchService.search(q ?? '', user.userId, user.workplaceId, resolved);
     }
 };
 exports.SearchController = SearchController;
@@ -30,8 +34,9 @@ __decorate([
     (0, common_1.Get)(),
     __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Query)('q')),
+    __param(2, (0, common_1.Query)('scope')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], SearchController.prototype, "search", null);
 exports.SearchController = SearchController = __decorate([

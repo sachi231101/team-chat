@@ -25,12 +25,14 @@ let PresenceController = class PresenceController {
     getAllPresence(user) {
         return this.presenceService.getAllPresence(user.workplaceId);
     }
+    setOwnPresence(user, body) {
+        return this.presenceService.setPresence(user.userId, body.status, body.statusMessage);
+    }
     setPresence(user, body, userId) {
-        if (userId && userId !== user.userId && user.role !== 'admin') {
+        if (userId !== user.userId && user.role !== 'admin') {
             throw new common_1.ForbiddenException('You can only update your own presence');
         }
-        const targetId = userId || user.userId;
-        return this.presenceService.setPresence(targetId, body.status, body.statusMessage);
+        return this.presenceService.setPresence(userId, body.status, body.statusMessage);
     }
 };
 exports.PresenceController = PresenceController;
@@ -42,7 +44,15 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PresenceController.prototype, "getAllPresence", null);
 __decorate([
-    (0, common_1.Patch)(':userId?'),
+    (0, common_1.Patch)(),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, update_presence_dto_1.UpdatePresenceDto]),
+    __metadata("design:returntype", void 0)
+], PresenceController.prototype, "setOwnPresence", null);
+__decorate([
+    (0, common_1.Patch)(':userId'),
     __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Param)('userId')),

@@ -11,5 +11,6 @@ export declare class CreateMessageDto {
     conversationId?: string;
     parentMessageId?: string;
     attachments?: AttachmentInputDto[];
+    scheduledFor?: string;
 }
 export {};

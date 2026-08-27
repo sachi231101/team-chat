@@ -34,7 +34,7 @@ exports.AppModule = AppModule = __decorate([
             throttler_1.ThrottlerModule.forRoot([
                 {
                     ttl: 60000,
-                    limit: 200,
+                    limit: process.env.NODE_ENV === 'production' ? 200 : 2000,
                 },
             ]),
             common_module_1.CommonModule,

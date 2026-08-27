@@ -13,6 +13,7 @@ exports.ChannelsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
 const chat_access_service_1 = require("../../common/chat-access.service");
+const safe_internal_error_1 = require("../../common/safe-internal-error");
 const client_1 = require("@prisma/client");
 let ChannelsService = class ChannelsService {
     prisma;
@@ -48,7 +49,7 @@ let ChannelsService = class ChannelsService {
             }));
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to fetch channels: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch channels', error);
         }
     }
     async findOne(id, workplaceId = 'wp-teamchat-main') {
@@ -77,13 +78,13 @@ let ChannelsService = class ChannelsService {
         catch (error) {
             if (error instanceof common_1.NotFoundException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch channel ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to fetch channel`, error);
         }
     }
     async create(data) {
         const creatorId = data.createdById;
         if (!creatorId) {
-            throw new common_1.InternalServerErrorException('createdById is required');
+            (0, safe_internal_error_1.throwInternal)('createdById is required');
         }
         const wpId = data.workplaceId || 'wp-teamchat-main';
         const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
@@ -127,7 +128,7 @@ let ChannelsService = class ChannelsService {
                 error.code === 'P2002') {
                 throw new common_1.ConflictException(`Channel #${normalizedName} already exists`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to create channel: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to create channel', error);
         }
     }
     async getMembers(channelId, user) {
@@ -155,15 +156,16 @@ let ChannelsService = class ChannelsService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch channel members: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch channel members', error);
         }
     }
     async addMembers(channelId, userIds, user) {
         try {
-            if (user) {
-                await this.chatAccess.assertCanManageChannelMembers(user, channelId);
-                await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, userIds);
+            if (!user) {
+                throw new common_1.UnauthorizedException('Authentication required');
             }
+            await this.chatAccess.assertCanManageChannelMembers(user, channelId);
+            await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, userIds);
             await this.prisma.$transaction(userIds.map((userId) => this.prisma.channelMember.upsert({
                 where: {
                     channelId_userId: { channelId, userId },
@@ -174,22 +176,25 @@ let ChannelsService = class ChannelsService {
             return this.getMembers(channelId, user);
         }
         catch (error) {
-            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+            if (error instanceof common_1.NotFoundException ||
+                error instanceof common_1.ForbiddenException ||
+                error instanceof common_1.UnauthorizedException) {
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to add channel members: ${error.message}`);
+            }
+            (0, safe_internal_error_1.throwInternal)('Failed to add channel members', error);
         }
     }
     async removeMember(channelId, targetUserId, user) {
         try {
-            if (user) {
-                const channel = await this.chatAccess.assertChannelAccess(user, channelId);
-                await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, [targetUserId]);
-                if (user.userId !== targetUserId) {
-                    const callerMember = channel.members.find((m) => m.userId === user.userId);
-                    if (callerMember?.role !== client_1.ChannelMemberRole.ADMIN && channel.createdById !== user.userId) {
-                        throw new common_1.ForbiddenException('Only channel admins can remove other members');
-                    }
-                }
+            if (!user) {
+                throw new common_1.UnauthorizedException('Authentication required');
+            }
+            await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, [targetUserId]);
+            if (user.userId === targetUserId) {
+                await this.chatAccess.assertChannelMembership(user, channelId);
+            }
+            else {
+                await this.chatAccess.assertCanManageChannelMembers(user, channelId);
             }
             await this.prisma.channelMember.deleteMany({
                 where: { channelId, userId: targetUserId },
@@ -197,9 +202,12 @@ let ChannelsService = class ChannelsService {
             return { success: true };
         }
         catch (error) {
-            if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
+            if (error instanceof common_1.NotFoundException ||
+                error instanceof common_1.ForbiddenException ||
+                error instanceof common_1.UnauthorizedException) {
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to remove channel member: ${error.message}`);
+            }
+            (0, safe_internal_error_1.throwInternal)('Failed to remove channel member', error);
         }
     }
 };

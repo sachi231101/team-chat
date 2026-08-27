@@ -11,8 +11,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConversationsService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma.service");
 const chat_access_service_1 = require("../../common/chat-access.service");
+const safe_internal_error_1 = require("../../common/safe-internal-error");
 let ConversationsService = class ConversationsService {
     prisma;
     chatAccess;
@@ -43,7 +45,7 @@ let ConversationsService = class ConversationsService {
             }));
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to fetch conversations: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch conversations', error);
         }
     }
     async findOne(id, workplaceId = 'wp-teamchat-main') {
@@ -67,7 +69,7 @@ let ConversationsService = class ConversationsService {
         catch (error) {
             if (error instanceof common_1.NotFoundException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch conversation ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch conversation', error);
         }
     }
     async create(data) {
@@ -75,10 +77,10 @@ let ConversationsService = class ConversationsService {
         const uniqueParticipants = Array.from(new Set(data.participants));
         try {
             await this.chatAccess.assertUsersBelongToWorkplace(wpId, uniqueParticipants);
-            const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
-            if (existing)
-                return existing;
-            const c = await this.prisma.$transaction(async (tx) => {
+            const conversation = await this.prisma.$transaction(async (tx) => {
+                const existing = await this.findMatchingConversationTx(tx, wpId, uniqueParticipants);
+                if (existing)
+                    return existing;
                 return tx.conversation.create({
                     data: {
                         workplaceId: wpId,
@@ -88,35 +90,30 @@ let ConversationsService = class ConversationsService {
                     },
                     include: { participants: true },
                 });
-            });
+            }, { isolationLevel: client_1.Prisma.TransactionIsolationLevel.Serializable });
             return {
-                id: c.id,
-                participants: c.participants.map((p) => p.userId),
-                workplaceId: c.workplaceId,
+                id: conversation.id,
+                participants: conversation.participants.map((p) => p.userId),
+                workplaceId: conversation.workplaceId,
                 unreadCount: 0,
-                createdAt: c.createdAt.toISOString(),
-                updatedAt: c.updatedAt.toISOString(),
+                createdAt: conversation.createdAt.toISOString(),
+                updatedAt: conversation.updatedAt.toISOString(),
             };
         }
         catch (error) {
             if (error instanceof common_1.BadRequestException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to create conversation: ${error.message}`);
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2034') {
+                const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
+                if (existing)
+                    return existing;
+            }
+            (0, safe_internal_error_1.throwInternal)('Failed to create conversation', error);
         }
     }
     async findMatchingConversation(workplaceId, participantIds) {
-        const wanted = [...participantIds].sort();
-        const convos = await this.prisma.conversation.findMany({
-            where: {
-                workplaceId,
-                participants: { some: { userId: { in: wanted } } },
-            },
-            include: { participants: true },
-        });
-        const match = convos.find((c) => {
-            const ids = c.participants.map((p) => p.userId).sort();
-            return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
-        });
+        const match = await this.findMatchingConversationTx(this.prisma, workplaceId, participantIds);
         if (!match)
             return null;
         return {
@@ -127,6 +124,20 @@ let ConversationsService = class ConversationsService {
             createdAt: match.createdAt.toISOString(),
             updatedAt: match.updatedAt.toISOString(),
         };
+    }
+    async findMatchingConversationTx(db, workplaceId, participantIds) {
+        const wanted = [...participantIds].sort();
+        const convos = await db.conversation.findMany({
+            where: {
+                workplaceId,
+                participants: { some: { userId: { in: wanted } } },
+            },
+            include: { participants: true },
+        });
+        return (convos.find((c) => {
+            const ids = c.participants.map((p) => p.userId).sort();
+            return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
+        }) ?? null);
     }
 };
 exports.ConversationsService = ConversationsService;

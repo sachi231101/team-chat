@@ -12,4 +12,5 @@ export declare class ConversationsService {
         workplaceId?: string;
     }): Promise<Conversation>;
     private findMatchingConversation;
+    private findMatchingConversationTx;
 }

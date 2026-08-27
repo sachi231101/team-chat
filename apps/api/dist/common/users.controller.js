@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("./prisma.service");
+const safe_internal_error_1 = require("./safe-internal-error");
 const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_dto_1 = require("./dto/update-user.dto");
 const update_presence_dto_1 = require("../presence/dto/update-presence.dto");
@@ -45,7 +46,7 @@ let UsersController = class UsersController {
             }));
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to fetch users: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch users', error);
         }
     }
     async findOne(id, user) {
@@ -71,7 +72,7 @@ let UsersController = class UsersController {
         catch (error) {
             if (error instanceof common_1.NotFoundException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch user ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to fetch user ${id}`, error);
         }
     }
     async create(user, body) {
@@ -103,7 +104,7 @@ let UsersController = class UsersController {
             };
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to create user: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to create user', error);
         }
     }
     async update(id, user, body) {
@@ -153,7 +154,7 @@ let UsersController = class UsersController {
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to update user ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to update user ${id}`, error);
         }
     }
     async updateStatus(id, user, body) {
@@ -193,7 +194,7 @@ let UsersController = class UsersController {
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to update status for user ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to update status for user ${id}`, error);
         }
     }
     async delete(id, user) {
@@ -216,7 +217,7 @@ let UsersController = class UsersController {
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${id} not found`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to delete user ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to delete user ${id}`, error);
         }
     }
 };

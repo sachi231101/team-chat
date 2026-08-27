@@ -64,4 +64,3 @@ export class ChannelsController {
     return this.channelsService.removeMember(id, userId, user);
   }
 }
-

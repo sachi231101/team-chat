@@ -11,11 +11,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var MessagesService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessagesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../common/prisma.service");
 const chat_access_service_1 = require("../../common/chat-access.service");
+const safe_internal_error_1 = require("../../common/safe-internal-error");
 const request_user_1 = require("../../common/request-user");
 const realtime_service_1 = require("../../realtime/realtime.service");
 const mentions_service_1 = require("../mentions/mentions.service");
@@ -41,18 +43,32 @@ const MESSAGE_INCLUDE = {
         orderBy: { createdAt: 'asc' },
     },
 };
-let MessagesService = class MessagesService {
+let MessagesService = MessagesService_1 = class MessagesService {
     prisma;
     chatAccess;
     realtime;
     mentions;
     ai;
+    logger = new common_1.Logger(MessagesService_1.name);
+    scheduleTimer = null;
     constructor(prisma, chatAccess, realtime, mentions, ai) {
         this.prisma = prisma;
         this.chatAccess = chatAccess;
         this.realtime = realtime;
         this.mentions = mentions;
         this.ai = ai;
+    }
+    onModuleInit() {
+        this.scheduleTimer = setInterval(() => {
+            void this.publishDueScheduledMessages().catch((err) => this.logger.warn(`Scheduled message publish failed: ${err.message}`));
+        }, 20_000);
+    }
+    onModuleDestroy() {
+        if (this.scheduleTimer)
+            clearInterval(this.scheduleTimer);
+    }
+    visibleMessageFilter() {
+        return { scheduledFor: null };
     }
     extractUser(userOrId) {
         if (typeof userOrId === 'string') {
@@ -77,6 +93,7 @@ let MessagesService = class MessagesService {
             const where = {
                 deletedAt: null,
                 parentMessageId: null,
+                ...this.visibleMessageFilter(),
             };
             if (channelId)
                 where.channelId = channelId;
@@ -111,7 +128,7 @@ let MessagesService = class MessagesService {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException || error instanceof common_1.BadRequestException) {
                 throw error;
             }
-            throw new common_1.InternalServerErrorException(`Failed to fetch messages: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch messages', error);
         }
     }
     async syncSince(userOrId, channelId, conversationId, since) {
@@ -128,6 +145,7 @@ let MessagesService = class MessagesService {
             }
             const where = {
                 deletedAt: null,
+                ...this.visibleMessageFilter(),
             };
             if (channelId)
                 where.channelId = channelId;
@@ -148,7 +166,7 @@ let MessagesService = class MessagesService {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException || error instanceof common_1.BadRequestException) {
                 throw error;
             }
-            throw new common_1.InternalServerErrorException(`Failed to sync messages: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to sync messages', error);
         }
     }
     async findOne(id, userOrId) {
@@ -168,7 +186,7 @@ let MessagesService = class MessagesService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch message ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch message', error);
         }
     }
     async create(userOrId, body) {
@@ -200,6 +218,20 @@ let MessagesService = class MessagesService {
         if (!trimmedContent && (!body.attachments || body.attachments.length === 0)) {
             throw new common_1.BadRequestException('Message must include text or at least one attachment');
         }
+        let scheduledFor = null;
+        if (body.scheduledFor) {
+            const when = new Date(body.scheduledFor);
+            if (Number.isNaN(when.getTime())) {
+                throw new common_1.BadRequestException('scheduledFor must be a valid ISO datetime');
+            }
+            if (when.getTime() <= Date.now() + 30_000) {
+                throw new common_1.BadRequestException('scheduledFor must be at least 30 seconds in the future');
+            }
+            if (when.getTime() > Date.now() + 365 * 24 * 60 * 60 * 1000) {
+                throw new common_1.BadRequestException('scheduledFor cannot be more than 1 year ahead');
+            }
+            scheduledFor = when;
+        }
         try {
             const m = await this.prisma.$transaction(async (tx) => {
                 const created = await tx.message.create({
@@ -210,6 +242,8 @@ let MessagesService = class MessagesService {
                         channelId: body.channelId,
                         conversationId: body.conversationId,
                         parentMessageId: body.parentMessageId,
+                        scheduledFor,
+                        ...(scheduledFor ? { createdAt: scheduledFor } : {}),
                         attachments: body.attachments && body.attachments.length > 0
                             ? {
                                 create: body.attachments.map((a) => ({
@@ -223,21 +257,26 @@ let MessagesService = class MessagesService {
                     },
                     include: MESSAGE_INCLUDE,
                 });
-                if (body.conversationId) {
-                    await tx.conversation.update({
-                        where: { id: body.conversationId },
-                        data: { updatedAt: new Date() },
-                    });
-                }
-                if (body.channelId) {
-                    await tx.channel.update({
-                        where: { id: body.channelId },
-                        data: { updatedAt: new Date() },
-                    });
+                if (!scheduledFor) {
+                    if (body.conversationId) {
+                        await tx.conversation.update({
+                            where: { id: body.conversationId },
+                            data: { updatedAt: new Date() },
+                        });
+                    }
+                    if (body.channelId) {
+                        await tx.channel.update({
+                            where: { id: body.channelId },
+                            data: { updatedAt: new Date() },
+                        });
+                    }
                 }
                 return created;
             });
             const dto = this.mapMessageToDto(m);
+            if (scheduledFor) {
+                return dto;
+            }
             this.realtime.emitToChat(dto, 'message:created', dto);
             void this.mentions.notifyFromMessage(dto);
             this.ai.onMessageCreated(dto);
@@ -247,8 +286,49 @@ let MessagesService = class MessagesService {
             if (error instanceof common_1.BadRequestException || error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException) {
                 throw error;
             }
-            throw new common_1.InternalServerErrorException(`Failed to create message: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to create message', error);
         }
+    }
+    async publishDueScheduledMessages() {
+        const due = await this.prisma.message.findMany({
+            where: {
+                deletedAt: null,
+                scheduledFor: { lte: new Date() },
+            },
+            include: MESSAGE_INCLUDE,
+            take: 50,
+            orderBy: { scheduledFor: 'asc' },
+        });
+        let published = 0;
+        for (const row of due) {
+            const updated = await this.prisma.message.update({
+                where: { id: row.id },
+                data: {
+                    scheduledFor: null,
+                    createdAt: row.scheduledFor ?? new Date(),
+                    updatedAt: new Date(),
+                },
+                include: MESSAGE_INCLUDE,
+            });
+            if (updated.channelId) {
+                await this.prisma.channel.update({
+                    where: { id: updated.channelId },
+                    data: { updatedAt: new Date() },
+                });
+            }
+            if (updated.conversationId) {
+                await this.prisma.conversation.update({
+                    where: { id: updated.conversationId },
+                    data: { updatedAt: new Date() },
+                });
+            }
+            const dto = this.mapMessageToDto(updated);
+            this.realtime.emitToChat(dto, 'message:created', dto);
+            void this.mentions.notifyFromMessage(dto);
+            this.ai.onMessageCreated(dto);
+            published += 1;
+        }
+        return published;
     }
     async update(id, content, userOrId) {
         try {
@@ -266,7 +346,7 @@ let MessagesService = class MessagesService {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException) {
                 throw error;
             }
-            throw new common_1.InternalServerErrorException(`Failed to update message ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to update message', error);
         }
     }
     async delete(id, userOrId) {
@@ -286,7 +366,7 @@ let MessagesService = class MessagesService {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException) {
                 throw error;
             }
-            throw new common_1.InternalServerErrorException(`Failed to delete message ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to delete message', error);
         }
     }
     async togglePin(id, userOrId) {
@@ -310,7 +390,7 @@ let MessagesService = class MessagesService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to toggle pin for message ${id}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to toggle pin', error);
         }
     }
     async toggleReaction(messageId, emoji, userOrId) {
@@ -352,7 +432,7 @@ let MessagesService = class MessagesService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to toggle reaction on message ${messageId}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to toggle reaction', error);
         }
     }
     async getReplies(parentMessageId, userOrId) {
@@ -373,7 +453,7 @@ let MessagesService = class MessagesService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to fetch replies: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch replies', error);
         }
     }
     async markAsRead(messageId, userOrId) {
@@ -400,7 +480,7 @@ let MessagesService = class MessagesService {
         catch (error) {
             if (error instanceof common_1.NotFoundException || error instanceof common_1.ForbiddenException)
                 throw error;
-            throw new common_1.InternalServerErrorException(`Failed to mark message as read: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to mark message as read', error);
         }
     }
     async findPinnedForUser(userOrId) {
@@ -442,6 +522,7 @@ let MessagesService = class MessagesService {
         const where = {
             pinned: true,
             deletedAt: null,
+            ...this.visibleMessageFilter(),
         };
         if (channelId)
             where.channelId = channelId;
@@ -467,6 +548,7 @@ let MessagesService = class MessagesService {
             conversationId: m.conversationId ?? undefined,
             parentMessageId: m.parentMessageId ?? undefined,
             pinned: m.pinned,
+            scheduledFor: m.scheduledFor?.toISOString(),
             editedAt: m.editedAt?.toISOString(),
             replyCount: m.replies ? m.replies.length : 0,
             lastReplyAt: m.replies && m.replies.length > 0
@@ -561,7 +643,7 @@ let MessagesService = class MessagesService {
     }
 };
 exports.MessagesService = MessagesService;
-exports.MessagesService = MessagesService = __decorate([
+exports.MessagesService = MessagesService = MessagesService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => ai_orchestrator_service_1.AiOrchestratorService))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,

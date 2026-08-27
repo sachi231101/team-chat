@@ -1,34 +1,39 @@
-import { SearchService } from './search.service';
+import { SearchService, SearchScope } from './search.service';
 import type { RequestUser } from '../common/request-user';
 export declare class SearchController {
     private readonly searchService;
     constructor(searchService: SearchService);
-    search(user: RequestUser, q: string): Promise<{
+    search(user: RequestUser, q: string, scope?: string): Promise<{
+        scope: SearchScope;
         messages: {
-            id: string;
-            content: string;
-            senderId: string;
-            senderName: string;
-            senderAvatar: string | undefined;
-            channelId: string | undefined;
+            id: any;
+            content: any;
+            senderId: any;
+            senderName: any;
+            senderAvatar: any;
+            channelId: any;
             channelName: any;
-            conversationId: string | undefined;
-            createdAt: string;
+            conversationId: any;
+            createdAt: any;
             reactions: never[];
-            updatedAt: string;
+            updatedAt: any;
         }[];
         channels: {
-            id: string;
-            name: string;
-            description: string | undefined;
-            type: string;
+            id: any;
+            name: any;
+            description: any;
+            type: any;
+            membersCount: undefined;
         }[];
         users: {
-            id: string;
-            name: string;
-            email: string;
-            avatarUrl: string | undefined;
-            title: string | undefined;
+            id: any;
+            name: any;
+            email: any;
+            avatarUrl: any;
+            title: any;
+            status: "online" | "busy" | "away" | "offline";
+            workplaceId: any;
+            createdAt: any;
         }[];
     }>;
 }

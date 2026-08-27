@@ -9,5 +9,6 @@ export declare class PresenceController {
         status: string;
         statusMessage?: string;
     }[]>;
-    setPresence(user: RequestUser, body: UpdatePresenceDto, userId?: string): Promise<import("@team-chat/shared").User>;
+    setOwnPresence(user: RequestUser, body: UpdatePresenceDto): Promise<import("@team-chat/shared").User>;
+    setPresence(user: RequestUser, body: UpdatePresenceDto, userId: string): Promise<import("@team-chat/shared").User>;
 }

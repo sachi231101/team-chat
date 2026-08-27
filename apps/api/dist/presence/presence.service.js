@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PresenceService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
+const safe_internal_error_1 = require("../common/safe-internal-error");
 const prisma_errors_1 = require("../common/prisma-errors");
 let PresenceService = class PresenceService {
     prisma;
@@ -31,7 +32,7 @@ let PresenceService = class PresenceService {
             }));
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to fetch presence: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch presence', error);
         }
     }
     async setPresence(userId, status, statusMessage) {
@@ -60,7 +61,7 @@ let PresenceService = class PresenceService {
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`User ${userId} not found`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to update presence for ${userId}: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to update presence for ${userId}`, error);
         }
     }
 };

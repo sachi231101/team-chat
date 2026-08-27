@@ -20,7 +20,7 @@ const common_1 = require("@nestjs/common");
 const presence_service_1 = require("../../presence/presence.service");
 const realtime_service_1 = require("../realtime.service");
 const chat_access_service_1 = require("../../common/chat-access.service");
-const request_user_1 = require("../../common/request-user");
+const mock_identity_1 = require("../../common/mock-identity");
 function allowedOrigins() {
     const raw = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || '';
     const fromEnv = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -43,12 +43,13 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
         this.realtime.setServer(server);
     }
     handleConnection(client) {
-        const userId = client.handshake.auth?.userId ||
-            client.handshake.headers['x-user-id'] ||
-            request_user_1.DEFAULT_MOCK_USER_ID;
-        const workplaceId = client.handshake.auth?.workplaceId ||
-            client.handshake.headers['x-workplace-id'] ||
-            request_user_1.DEFAULT_WORKPLACE_ID;
+        const identity = (0, mock_identity_1.resolveMockIdentityFromHandshake)({
+            authUserId: client.handshake.auth?.userId,
+            authWorkplaceId: client.handshake.auth?.workplaceId,
+            headers: client.handshake.headers,
+        });
+        const userId = identity.userId;
+        const workplaceId = identity.workplaceId;
         client.data.userId = userId;
         client.data.workplaceId = workplaceId;
         client.join(`user:${userId}`);

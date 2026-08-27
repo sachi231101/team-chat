@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
+const safe_internal_error_1 = require("../common/safe-internal-error");
 const prisma_errors_1 = require("../common/prisma-errors");
 let NotificationsService = class NotificationsService {
     prisma;
@@ -40,7 +41,7 @@ let NotificationsService = class NotificationsService {
             }));
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to fetch notifications: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to fetch notifications', error);
         }
     }
     async markAsRead(id, userId) {
@@ -63,7 +64,7 @@ let NotificationsService = class NotificationsService {
             if ((0, prisma_errors_1.isPrismaNotFound)(error)) {
                 throw new common_1.NotFoundException(`Notification ${id} not found`);
             }
-            throw new common_1.InternalServerErrorException(`Failed to mark notification ${id} as read: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)(`Failed to mark notification ${id} as read`, error);
         }
     }
     async markAllAsRead(userId) {
@@ -75,7 +76,7 @@ let NotificationsService = class NotificationsService {
             return { success: true };
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException(`Failed to mark all notifications as read: ${error.message}`);
+            (0, safe_internal_error_1.throwInternal)('Failed to mark all notifications as read', error);
         }
     }
     formatTimeAgo(date) {

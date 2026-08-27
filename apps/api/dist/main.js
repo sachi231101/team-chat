@@ -27,7 +27,6 @@ async function bootstrap() {
     if (!(0, fs_1.existsSync)(attachments_service_1.UPLOAD_DIR)) {
         (0, fs_1.mkdirSync)(attachments_service_1.UPLOAD_DIR, { recursive: true });
     }
-    app.useStaticAssets(attachments_service_1.UPLOAD_DIR, { prefix: '/uploads/' });
     app.use((0, helmet_1.default)({
         crossOriginEmbedderPolicy: false,
         contentSecurityPolicy: false,

@@ -1,3 +1,4 @@
+import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Message as PrismaMessage, User, MessageReaction, Attachment, MessageTag, ActionItem } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService, UserContext } from '../../common/chat-access.service';
@@ -26,18 +27,24 @@ export interface MessageListResult {
     nextCursor: string | null;
     lastReadMessageId: string | null;
 }
-export declare class MessagesService {
+export declare class MessagesService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma;
     private readonly chatAccess;
     private readonly realtime;
     private readonly mentions;
     private readonly ai;
+    private readonly logger;
+    private scheduleTimer;
     constructor(prisma: PrismaService, chatAccess: ChatAccessService, realtime: RealtimeService, mentions: MentionsService, ai: AiOrchestratorService);
+    onModuleInit(): void;
+    onModuleDestroy(): void;
+    private visibleMessageFilter;
     private extractUser;
     findAll(userOrId: UserContext | string, channelId?: string, conversationId?: string, limit?: number, cursor?: string): Promise<MessageListResult>;
     syncSince(userOrId: UserContext | string, channelId?: string, conversationId?: string, since?: string): Promise<Message[]>;
     findOne(id: string, userOrId?: UserContext | string): Promise<Message>;
     create(userOrId: UserContext | string, body: CreateMessageDto): Promise<Message>;
+    publishDueScheduledMessages(): Promise<number>;
     update(id: string, content: string, userOrId: UserContext | string): Promise<Message>;
     delete(id: string, userOrId: UserContext | string): Promise<{
         success: boolean;

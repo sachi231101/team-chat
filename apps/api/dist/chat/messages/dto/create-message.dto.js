@@ -42,6 +42,7 @@ class CreateMessageDto {
     conversationId;
     parentMessageId;
     attachments;
+    scheduledFor;
 }
 exports.CreateMessageDto = CreateMessageDto;
 __decorate([
@@ -76,4 +77,9 @@ __decorate([
     (0, class_transformer_1.Type)(() => AttachmentInputDto),
     __metadata("design:type", Array)
 ], CreateMessageDto.prototype, "attachments", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateMessageDto.prototype, "scheduledFor", void 0);
 //# sourceMappingURL=create-message.dto.js.map

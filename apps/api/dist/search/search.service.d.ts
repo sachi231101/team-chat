@@ -1,33 +1,39 @@
 import { PrismaService } from '../common/prisma.service';
+export type SearchScope = 'all' | 'channels' | 'people' | 'messages';
 export declare class SearchService {
     private readonly prisma;
     constructor(prisma: PrismaService);
-    search(query: string, userId: string, workplaceId?: string): Promise<{
+    search(query: string, userId: string, workplaceId?: string, scope?: SearchScope): Promise<{
+        scope: SearchScope;
         messages: {
-            id: string;
-            content: string;
-            senderId: string;
-            senderName: string;
-            senderAvatar: string | undefined;
-            channelId: string | undefined;
+            id: any;
+            content: any;
+            senderId: any;
+            senderName: any;
+            senderAvatar: any;
+            channelId: any;
             channelName: any;
-            conversationId: string | undefined;
-            createdAt: string;
+            conversationId: any;
+            createdAt: any;
             reactions: never[];
-            updatedAt: string;
+            updatedAt: any;
         }[];
         channels: {
-            id: string;
-            name: string;
-            description: string | undefined;
-            type: string;
+            id: any;
+            name: any;
+            description: any;
+            type: any;
+            membersCount: undefined;
         }[];
         users: {
-            id: string;
-            name: string;
-            email: string;
-            avatarUrl: string | undefined;
-            title: string | undefined;
+            id: any;
+            name: any;
+            email: any;
+            avatarUrl: any;
+            title: any;
+            status: "online" | "busy" | "away" | "offline";
+            workplaceId: any;
+            createdAt: any;
         }[];
     }>;
 }

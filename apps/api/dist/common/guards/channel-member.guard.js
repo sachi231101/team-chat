@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChannelMemberGuard = void 0;
 const common_1 = require("@nestjs/common");
 const chat_access_service_1 = require("../chat-access.service");
-const request_user_1 = require("../request-user");
+const mock_identity_1 = require("../mock-identity");
 let ChannelMemberGuard = class ChannelMemberGuard {
     chatAccess;
     constructor(chatAccess) {
@@ -20,14 +20,13 @@ let ChannelMemberGuard = class ChannelMemberGuard {
     }
     async canActivate(context) {
         const req = context.switchToHttp().getRequest();
-        const user = req.user || (0, request_user_1.readUserFromHeaders)(req.headers);
-        req.user = user;
+        const user = (0, mock_identity_1.attachMockIdentity)(req);
         const channelId = req.params?.channelId ||
             (req.route?.path?.includes('channels') ? req.params?.id : undefined) ||
             req.query?.channelId ||
             req.body?.channelId;
-        if (!channelId) {
-            return true;
+        if (!channelId || typeof channelId !== 'string') {
+            throw new common_1.BadRequestException('channelId is required');
         }
         try {
             await this.chatAccess.assertChannelAccess(user, channelId);
