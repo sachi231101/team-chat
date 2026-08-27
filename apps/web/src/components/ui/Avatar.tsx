@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserStatus } from '@team-chat/shared';
 import { cn } from '../../lib/utils';
+import { resolveAssetUrl } from '../../lib/assets';
 
 export interface AvatarProps {
   name: string;
@@ -43,6 +44,11 @@ export const Avatar: React.FC<AvatarProps> = ({
   showStatus = Boolean(status),
 }) => {
   const [imageError, setImageError] = useState(false);
+  const resolvedSrc = resolveAssetUrl(src);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [resolvedSrc]);
 
   const getInitials = (n: string) => {
     const parts = n.trim().split(' ');
@@ -72,9 +78,9 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <div className={cn('relative inline-flex shrink-0 select-none items-center justify-center rounded-xl font-medium text-white shadow-sm', sizeMap[size], className)}>
-      {src && !imageError ? (
+      {resolvedSrc && !imageError ? (
         <img
-          src={src}
+          src={resolvedSrc}
           alt={name}
           onError={() => setImageError(true)}
           className="h-full w-full rounded-xl object-cover"

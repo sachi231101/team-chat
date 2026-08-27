@@ -2,11 +2,12 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders, RequestUser } from '../request-user';
+import { attachMockIdentity } from '../mock-identity';
 
 @Injectable()
 export class ChannelMemberGuard implements CanActivate {
@@ -14,8 +15,7 @@ export class ChannelMemberGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
-    req.user = user;
+    const user = attachMockIdentity(req);
 
     const channelId =
       req.params?.channelId ||
@@ -23,8 +23,8 @@ export class ChannelMemberGuard implements CanActivate {
       req.query?.channelId ||
       req.body?.channelId;
 
-    if (!channelId) {
-      return true;
+    if (!channelId || typeof channelId !== 'string') {
+      throw new BadRequestException('channelId is required');
     }
 
     try {
@@ -38,4 +38,3 @@ export class ChannelMemberGuard implements CanActivate {
     }
   }
 }
-

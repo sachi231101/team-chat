@@ -1,5 +1,6 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { throwInternal } from '../common/safe-internal-error';
 import { NotificationItem } from '@team-chat/shared';
 import { isPrismaNotFound } from '../common/prisma-errors';
 
@@ -30,9 +31,7 @@ export class NotificationsService {
         createdAt: n.createdAt.toISOString(),
       }));
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to fetch notifications: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch notifications', error);
     }
   }
 
@@ -54,9 +53,7 @@ export class NotificationsService {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`Notification ${id} not found`);
       }
-      throw new InternalServerErrorException(
-        `Failed to mark notification ${id} as read: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to mark notification ${id} as read`, error);
     }
   }
 
@@ -68,9 +65,7 @@ export class NotificationsService {
       });
       return { success: true };
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to mark all notifications as read: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to mark all notifications as read', error);
     }
   }
 

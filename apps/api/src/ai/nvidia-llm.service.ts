@@ -59,18 +59,28 @@ export class NvidiaLlmService {
       stream: false,
     };
 
-    const completion = await this.client.chat.completions.create(params);
+    try {
+      const completion = await this.client.chat.completions.create(params);
+      const message = completion.choices[0]?.message;
+      let content = message?.content?.trim() ?? '';
 
-    const message = completion.choices[0]?.message;
-    let content = message?.content?.trim() ?? '';
+      // Strip out <think>...</think> tags if emitted by reasoning models
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-    // Strip out <think>...</think> tags if emitted by reasoning models
-    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-    if (!content) {
-      this.logger.warn('NVIDIA completion returned empty content');
+      if (!content) {
+        this.logger.warn('NVIDIA completion returned empty content');
+      }
+      return content;
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const model = this.model();
+      if (status === 404) {
+        throw new Error(
+          `NVIDIA model not found (404) for "${model}". Check AI_MODEL in apps/api/.env against https://build.nvidia.com`,
+        );
+      }
+      throw err;
     }
-    return content;
   }
 
   private model(): string {

@@ -63,6 +63,7 @@ export interface Message {
   actionItems?: ActionItem[];
   poll?: Poll;
   pinned?: boolean;
+  scheduledFor?: string;
   editedAt?: string;
   deliveryStatus?: 'sending' | 'sent' | 'failed';
   createdAt: string;

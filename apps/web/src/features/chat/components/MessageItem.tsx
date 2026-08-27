@@ -11,7 +11,6 @@ import {
   Download,
   FileText,
   Check,
-  Image as ImageIcon,
   Sparkles,
   CheckSquare,
   BookmarkCheck,
@@ -82,6 +81,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
   const [editContent, setEditContent] = useState(message.content);
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [actionsPinned, setActionsPinned] = useState(false);
 
   const { currentUser, conversations } = useWorkspace();
   const { savedMessageIds } = useWorkspace();
@@ -95,6 +95,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
     openExtractWorkForTarget,
     openRecordDecision,
     setAiLearningModalOpen,
+    density,
   } = useUiStore();
 
   const isEditing = localEditing || editingMessageId === message.id;
@@ -193,7 +194,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
     <div
       id={`msg-${message.id}`}
       data-message-id={message.id}
-      className="group relative flex gap-3 px-4 py-1.5 transition-colors"
+      className={`group relative flex items-start gap-3 px-4 transition-colors ${
+        density === 'compact' ? 'py-0.5' : 'py-1.5'
+      }`}
       style={{
         background: hovered
           ? 'rgba(255,255,255,0.025)'
@@ -203,13 +206,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
         outline: focusMessageId === message.id ? '1px solid var(--color-active-border)' : undefined,
       }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => {
+        if (!showMoreActions && !showTagMenu && !showEmojiPicker) setHovered(false);
+      }}
+      onFocusCapture={() => setHovered(true)}
+      onTouchStart={() => setHovered(true)}
     >
       {/* ── Avatar ─────────────────────────────────────────── */}
       <button
         type="button"
         onClick={openSenderChat}
-        className="mt-0.5 shrink-0 rounded-lg transition-opacity hover:opacity-80"
+        className="mt-0.5 shrink-0 self-start rounded-lg transition-opacity hover:opacity-80"
         title={`Message ${message.senderName}`}
       >
         <Avatar
@@ -359,36 +366,48 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
               return (
                 <div
                   key={act.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all ${
-                    isDone
-                      ? 'bg-stone-950/30 border-stone-800/40 opacity-75'
-                      : 'bg-stone-950/80 border-emerald-500/30 shadow-sm'
-                  }`}
+                  className="flex items-center gap-2 rounded-lg border p-2 text-xs transition-all"
+                  style={{
+                    background: isDone ? 'var(--color-elevated)' : 'var(--color-accent-muted)',
+                    borderColor: isDone ? 'var(--color-border)' : 'var(--color-active-border)',
+                    opacity: isDone ? 0.8 : 1,
+                  }}
                 >
                   <button
                     type="button"
                     onClick={() => handleToggleActionStatus(act.id, act.status)}
-                    className="text-stone-400 hover:text-emerald-400 transition-colors"
+                    className="transition-colors"
+                    style={{ color: isDone ? '#16a34a' : 'var(--color-text-tertiary)' }}
                   >
-                    <CheckSquare
-                      className={`w-3.5 h-3.5 ${isDone ? 'text-emerald-400' : 'text-stone-500'}`}
-                    />
+                    <CheckSquare className="h-3.5 w-3.5" />
                   </button>
                   <span
-                    className={`flex-1 font-medium truncate ${
-                      isDone ? 'line-through text-stone-500' : 'text-stone-200'
-                    }`}
+                    className={`min-w-0 flex-1 truncate font-medium ${isDone ? 'line-through' : ''}`}
+                    style={{
+                      color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+                    }}
                   >
                     {act.title}
                   </span>
                   {act.assigneeName && (
-                    <span className="px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 border border-stone-800 text-[10px]">
+                    <span
+                      className="rounded border px-1.5 py-0.5 text-[10px]"
+                      style={{
+                        background: 'var(--color-input)',
+                        borderColor: 'var(--color-border)',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                    >
                       @{act.assigneeName}
                     </span>
                   )}
                   {act.dueDate && (
-                    <span className="text-[10px] text-stone-400">
-                      Due {new Date(act.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                      Due{' '}
+                      {new Date(act.dueDate).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </span>
                   )}
                 </div>
@@ -414,39 +433,33 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
                 return (
                   <div
                     key={att.id}
-                    className="group/img relative overflow-hidden rounded-xl w-full max-w-md transition-all"
+                    className="group/img relative w-[180px] overflow-hidden rounded-lg transition-all"
                     style={{
                       background: 'var(--color-elevated)',
                       border: '1px solid var(--color-border)',
                     }}
                   >
-                    <div className="relative max-h-80 w-full overflow-hidden">
+                    <a href={assetUrl} target="_blank" rel="noreferrer" className="block">
                       <img
                         src={assetUrl}
                         alt={att.name}
-                        className="max-h-80 w-full object-contain"
+                        className="h-28 w-full object-cover"
+                        title={att.name}
                       />
-                    </div>
-                    <div className="flex items-center justify-between p-2.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ImageIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                            {att.name}
-                          </span>
-                          <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                            {(att.size / (1024 * 1024)).toFixed(1)} MB
-                          </span>
-                        </div>
-                      </div>
+                    </a>
+                    <div className="flex items-center justify-between gap-1 px-2 py-1.5">
+                      <span className="min-w-0 truncate text-[10px] font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                        {att.name}
+                      </span>
                       <a
                         href={assetUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded p-1.5 transition-colors hover:bg-white/10"
+                        className="shrink-0 rounded p-1 transition-colors hover:bg-white/10"
                         style={{ color: 'var(--color-text-tertiary)' }}
+                        title="Open full size"
                       >
-                        <Download className="h-3.5 w-3.5" />
+                        <Download className="h-3 w-3" />
                       </a>
                     </div>
                   </div>
@@ -570,38 +583,38 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
         )}
       </div>
 
-      {/* ── Floating Hover Action Bar ───────────────────────── */}
-      {hovered && !isEditing && (
+      {/* Floating action bar — primary actions only; AI/extras under More */}
+      {(hovered || actionsPinned) && !isEditing && (
         <div
           className="absolute right-4 -top-4 flex items-center rounded-lg p-0.5 shadow-2xl z-20 animate-in zoom-in-95"
           style={{
             background: 'var(--color-elevated)',
             border: '1px solid var(--color-border)',
           }}
+          onMouseEnter={() => setHovered(true)}
         >
-          {/* Quick emojis */}
           <div
             className="flex items-center px-0.5 gap-0.5"
             style={{ borderRight: '1px solid var(--color-border)' }}
           >
-            {QUICK_EMOJIS.slice(0, 4).map((emoji) => (
+            {QUICK_EMOJIS.slice(0, 3).map((emoji) => (
               <button
                 key={emoji}
+                type="button"
                 onClick={() => toggleReaction.mutate({ id: message.id, emoji })}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all hover:scale-110"
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all hover:scale-110 hover-surface"
               >
                 {emoji}
               </button>
             ))}
           </div>
 
-          {/* Core Action Buttons */}
           <Tooltip content="Add reaction" side="top">
             <button
+              type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
+              style={{ color: 'var(--color-text-tertiary)' }}
             >
               <Smile className="h-3.5 w-3.5" />
             </button>
@@ -610,164 +623,177 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
           {!isThreadReply && (
             <Tooltip content="Reply in thread" side="top">
               <button
+                type="button"
                 onClick={() => openThread(message.id)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
+                style={{ color: 'var(--color-text-tertiary)' }}
               >
                 <MessageSquare className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
           )}
 
-          {/* AI Advantage 1: Conversation-to-work */}
-          <Tooltip content="Extract Work & Decisions (AI)" side="top">
-            <button
-              onClick={() => openExtractWorkForTarget({ messageId: message.id })}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/15 transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-
-          {/* Action Management: Create Action Item (Pillar 5) */}
-          <Tooltip content="Turn into Action Item" side="top">
-            <button
-              onClick={() => openCreateActionForMessage(message)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-400 hover:bg-emerald-500/15 transition-colors"
-            >
-              <CheckSquare className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-
-          {/* Context Preservation: Tag Decision / Highlight (Pillar 4 & 7) */}
-          <Tooltip content="Tag Decision / Highlight" side="top">
-            <button
-              onClick={() => setShowTagMenu(!showTagMenu)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-amber-400 hover:bg-amber-500/15 transition-colors"
-            >
-              <BookmarkCheck className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-
-          <Tooltip content={message.pinned ? 'Unpin message' : 'Pin message'} side="top">
-            <button
-              onClick={() => togglePin.mutate(message.id)}
-              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-              style={{
-                color: message.pinned ? 'var(--color-pin)' : 'var(--color-text-secondary)',
-                background: message.pinned ? 'rgba(245,158,11,0.12)' : 'transparent',
-              }}
-            >
-              <Pin className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-
-          <Tooltip content={isSaved ? 'Remove from saved' : 'Save for later'} side="top">
-            <button
-              onClick={() => toggleSave.mutate(message.id)}
-              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-              style={{
-                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                background: isSaved ? 'rgba(124,58,237,0.12)' : 'transparent',
-              }}
-            >
-              <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current")} />
-            </button>
-          </Tooltip>
-
           <Tooltip content="More actions" side="top">
             <button
-              onClick={() => setShowMoreActions(!showMoreActions)}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 hover:text-stone-200 hover:bg-white/10 transition-colors"
+              type="button"
+              onClick={() => {
+                setActionsPinned(true);
+                setShowMoreActions(!showMoreActions);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
+              style={{ color: 'var(--color-text-tertiary)' }}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
           </Tooltip>
 
-          {/* Tag Dropdown Menu (Pillar 4) */}
-          {showTagMenu && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowTagMenu(false)} />
-              <div
-                className="absolute right-12 top-full mt-1 w-44 rounded-xl p-1.5 shadow-2xl z-40 animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
-              >
-                <div className="px-2 py-1 text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
-                  Tag Message As
-                </div>
-                {(['DECISION', 'KEY_TAKEAWAY', 'ANNOUNCEMENT', 'FOLLOW_UP'] as MessageTagType[]).map((t) => {
-                  const cfg = TAG_CONFIG[t];
-                  const Icon = cfg.icon;
-                  const hasTag = message.tags?.some((x) => x.tag === t);
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        toggleMessageTag.mutate({ messageId: message.id, tag: t });
-                        setShowTagMenu(false);
-                      }}
-                      className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
-                        hasTag ? 'bg-amber-500/15 text-amber-300' : 'text-stone-300 hover:bg-stone-800'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{cfg.label}</span>
-                      </div>
-                      {hasTag && <Check className="w-3 h-3 text-amber-400" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* More dropdown */}
           {showMoreActions && (
             <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowMoreActions(false)} />
               <div
-                className="absolute right-0 top-full mt-1 w-44 rounded-xl p-1.5 shadow-2xl z-40 animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
+                className="fixed inset-0 z-30"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  setShowTagMenu(false);
+                  setActionsPinned(false);
+                }}
+              />
+              <div
+                className="absolute right-0 top-full z-40 mt-1 w-52 animate-in fade-in zoom-in-95 rounded-xl border p-1.5 shadow-2xl"
+                style={{
+                  background: 'var(--color-modal)',
+                  borderColor: 'var(--color-border)',
+                }}
               >
                 <button
-                  onClick={() => { openCreateActionForMessage(message); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
+                  type="button"
+                  onClick={() => { openExtractWorkForTarget({ messageId: message.id }); setShowMoreActions(false); setActionsPinned(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
-                  <CheckSquare className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Create Action Item</span>
+                  <Sparkles className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
+                  <span>Extract work (AI)</span>
                 </button>
                 <button
-                  onClick={() => { toggleSave.mutate(message.id); setShowMoreActions(false); }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
+                  type="button"
+                  onClick={() => { openCreateActionForMessage(message); setShowMoreActions(false); setActionsPinned(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
-                  <Bookmark className={cn("h-3.5 w-3.5", isSaved && "fill-current text-violet-400")} />
-                  <span>{isSaved ? 'Remove from saved' : 'Save message'}</span>
+                  <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Create action item</span>
                 </button>
-
-                <div className="my-1 border-t border-stone-800" />
-
                 <button
-                  onClick={handleCopy}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
+                  type="button"
+                  onClick={() => setShowTagMenu(!showTagMenu)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
-                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  <BookmarkCheck className="h-3.5 w-3.5 text-amber-500" />
+                  <span>Tag message</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { togglePin.mutate(message.id); setShowMoreActions(false); setActionsPinned(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <Pin className="h-3.5 w-3.5" />
+                  <span>{message.pinned ? 'Unpin' : 'Pin message'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { toggleSave.mutate(message.id); setShowMoreActions(false); setActionsPinned(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <Bookmark
+                    className={cn('h-3.5 w-3.5', isSaved && 'fill-current')}
+                    style={isSaved ? { color: 'var(--color-accent)' } : undefined}
+                  />
+                  <span>{isSaved ? 'Remove from saved' : 'Save for later'}</span>
+                </button>
+                <div className="my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />
+                <button
+                  type="button"
+                  onClick={() => { handleCopy(); setShowMoreActions(false); setActionsPinned(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                   <span>{copied ? 'Copied!' : 'Copy text'}</span>
                 </button>
                 {isAuthor && (
                   <>
                     <button
-                      onClick={() => { setIsEditing(true); setShowMoreActions(false); }}
-                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-300 hover:bg-stone-800 transition-colors"
+                      type="button"
+                      onClick={() => { setIsEditing(true); setShowMoreActions(false); setActionsPinned(false); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors hover-surface"
+                      style={{ color: 'var(--color-text-primary)' }}
                     >
-                      <Edit2 className="h-3.5 w-3.5 text-sky-400" />
+                      <Edit2 className="h-3.5 w-3.5 text-sky-500" />
                       <span>Edit message</span>
                     </button>
                     <button
-                      onClick={() => { deleteMessage.mutate(message.id); setShowMoreActions(false); }}
-                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      type="button"
+                      onClick={() => { deleteMessage.mutate(message.id); setShowMoreActions(false); setActionsPinned(false); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors"
+                      style={{ color: 'var(--color-danger)' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--color-danger-muted)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       <span>Delete</span>
                     </button>
                   </>
+                )}
+                {showTagMenu && (
+                  <div className="mt-1 border-t pt-1" style={{ borderColor: 'var(--color-border)' }}>
+                    <div
+                      className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--color-text-tertiary)' }}
+                    >
+                      Tag as
+                    </div>
+                    {(['DECISION', 'KEY_TAKEAWAY', 'ANNOUNCEMENT', 'FOLLOW_UP'] as MessageTagType[]).map((t) => {
+                      const cfg = TAG_CONFIG[t];
+                      const Icon = cfg.icon;
+                      const hasTag = message.tags?.some((x) => x.tag === t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            toggleMessageTag.mutate({ messageId: message.id, tag: t });
+                            setShowTagMenu(false);
+                            setShowMoreActions(false);
+                            setActionsPinned(false);
+                          }}
+                          className={cn(
+                            'flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors',
+                            !hasTag && 'hover-surface',
+                          )}
+                          style={
+                            hasTag
+                              ? {
+                                  background: 'rgba(217, 119, 6, 0.12)',
+                                  color: 'var(--color-pin)',
+                                }
+                              : { color: 'var(--color-text-primary)' }
+                          }
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="h-3.5 w-3.5" />
+                            <span>{cfg.label}</span>
+                          </div>
+                          {hasTag && <Check className="h-3 w-3" style={{ color: 'var(--color-pin)' }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </>
@@ -780,13 +806,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isThreadReply
         <>
           <div className="fixed inset-0 z-30" onClick={() => setShowEmojiPicker(false)} />
           <div
-            className="absolute right-4 top-8 z-40 grid grid-cols-4 gap-1 rounded-xl p-2 shadow-2xl animate-in fade-in zoom-in-95 bg-stone-900 border border-stone-800"
+            className="absolute right-4 top-8 z-40 grid grid-cols-4 gap-1 rounded-xl border p-2 shadow-2xl animate-in fade-in zoom-in-95"
+            style={{
+              background: 'var(--color-modal)',
+              borderColor: 'var(--color-border)',
+            }}
           >
             {QUICK_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
+                type="button"
                 onClick={() => { toggleReaction.mutate({ id: message.id, emoji }); setShowEmojiPicker(false); }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110 hover:bg-stone-800"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110 hover-surface"
               >
                 {emoji}
               </button>

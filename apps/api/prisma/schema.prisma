@@ -155,6 +155,7 @@ model Message {
   conversationId  String?
   parentMessageId String?
   pinned          Boolean   @default(false)
+  scheduledFor    DateTime?
   editedAt        DateTime?
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
@@ -178,6 +179,7 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([parentMessageId])
   @@index([clientMessageId])
+  @@index([scheduledFor])
   @@map("messages")
 }
 

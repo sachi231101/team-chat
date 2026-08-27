@@ -131,7 +131,14 @@ export const CustomSidebarSectionRow: React.FC<CustomSidebarSectionRowProps> = (
             )}
             <IconComponent className="h-3.5 w-3.5 shrink-0 text-violet-400" />
             <span className="truncate">{section.name}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-800 text-stone-400 font-normal shrink-0">
+            <span
+              className="text-[10px] px-1.5 py-0.2 rounded-full font-normal shrink-0"
+              style={{
+                background: 'var(--color-elevated)',
+                color: 'var(--color-text-tertiary)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
               {sectionChannels.length}
             </span>
           </button>

@@ -80,6 +80,7 @@ export const ThreadPanel: React.FC = () => {
             channelId={activeType === 'channel' ? activeId : undefined}
             conversationId={activeType === 'conversation' ? activeId : undefined}
             parentMessageId={activeThreadId ?? undefined}
+            title="Catch me up on thread"
           />
           <Button variant="ghost" size="icon" onClick={closeThread}>
             <X className="h-4 w-4" />

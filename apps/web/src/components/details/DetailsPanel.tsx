@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Hash,
@@ -10,28 +10,40 @@ import {
   Bell,
   UserPlus,
   LogOut,
+  Loader2,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace, useActiveMessages, useContextPinnedMessagesQuery, useChatMutations, useResizablePanel } from '../../hooks';
+import {
+  useWorkspace,
+  useActiveMessages,
+  useContextPinnedMessagesQuery,
+  useChatMutations,
+  useResizablePanel,
+  useChannelMembersQuery,
+} from '../../hooks';
 import { Avatar } from '../ui';
 import { ResizeHandle } from '../common';
 
 const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
 
 export const DetailsPanel: React.FC = () => {
+  const [showAllMembers, setShowAllMembers] = useState(false);
   const {
     activeId,
     activeType,
     detailsPanelOpen,
     toggleDetailsPanel,
     setChatHeaderTab,
-    setPeopleModalOpen,
+    setAddMembersModalOpen,
     setSettingsModalOpen,
-  } = useUiStore();
-  const { channels, conversations, users, currentUser } = useWorkspace();
+  } = useUiStore();  const { channels, conversations, users, currentUser } = useWorkspace();
   const { messages } = useActiveMessages();
   const pinnedQuery = useContextPinnedMessagesQuery();
   const { leaveChannel } = useChatMutations();
+
+  const channelIdForMembers =
+    detailsPanelOpen && activeType === 'channel' ? activeId : null;
+  const membersQuery = useChannelMembersQuery(channelIdForMembers);
 
   if (!detailsPanelOpen) return null;
 
@@ -71,20 +83,33 @@ export const DetailsPanel: React.FC = () => {
     leaveChannel.mutate(currentChannel.id);
   };
 
-  const handleSeeAllMembers = () => {
-    setPeopleModalOpen(true);
-  };
-
   const isChannel = activeType === 'channel' && currentChannel;
   const name = isChannel ? currentChannel.name : otherUser?.name ?? '';
   const description = isChannel
     ? currentChannel.description || 'Company-wide announcements and discussions.'
     : '';
 
-  // Show the first 5 users as members
-  const memberCount = isChannel ? (currentChannel.membersCount ?? users.length) : users.length;
-  const visibleMembers = users.slice(0, 5);
-  const extraMembers = Math.max(0, memberCount - 5);
+  const channelMembers = membersQuery.data ?? [];
+  const memberCount = isChannel
+    ? channelMembers.length || currentChannel.membersCount || 0
+    : currentConversation?.participants.length ?? 0;
+  const previewMembers = showAllMembers ? channelMembers : channelMembers.slice(0, 5);
+  const extraMembers = Math.max(0, channelMembers.length - 5);
+  const creator = isChannel
+    ? users.find((u) => u.id === currentChannel.createdById) ||
+      channelMembers.find((u) => u.id === currentChannel.createdById)
+    : null;
+  const createdLabel = isChannel
+    ? `Created by ${creator?.name ?? 'Unknown'}${
+        currentChannel.createdAt
+          ? ` on ${new Date(currentChannel.createdAt).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}`
+          : ''
+      }`
+    : '';
 
   const dividerRow = (
     <div className="h-px mx-0 my-1" style={{ background: 'var(--color-border-subtle)' }} />
@@ -185,9 +210,9 @@ export const DetailsPanel: React.FC = () => {
             {description}
           </p>
         )}
-        {isChannel && (
+        {isChannel && createdLabel && (
           <p className="mt-1 text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
-            Created by {users[0]?.name ?? 'Unknown'} on Jan 10, 2024
+            {createdLabel}
           </p>
         )}
       </div>
@@ -197,37 +222,90 @@ export const DetailsPanel: React.FC = () => {
         <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>
-              {memberCount} Members
+              {membersQuery.isLoading ? 'Members' : `${memberCount} ${memberCount === 1 ? 'Member' : 'Members'}`}
             </span>
-            <button
-              type="button"
-              onClick={handleSeeAllMembers}
-              className="text-[11px] font-semibold"
-              style={{ color: 'var(--color-accent)' }}
-            >
-              See all
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            {visibleMembers.map((u) => (
-              <div key={u.id} className="h-7 w-7 rounded-full overflow-hidden ring-1 ring-[var(--color-border)]">
-                <Avatar name={u.name} src={u.avatarUrl} size="xs" status={u.status} />
-              </div>
-            ))}
-            {extraMembers > 0 && (
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold"
-                style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+            {channelMembers.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setShowAllMembers((v) => !v)}
+                className="text-[11px] font-semibold"
+                style={{ color: 'var(--color-accent)' }}
               >
-                +{extraMembers}
-              </div>
+                {showAllMembers ? 'Show less' : 'See all'}
+              </button>
             )}
           </div>
+          {membersQuery.isLoading ? (
+            <div className="flex items-center gap-2 py-1 text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading members…
+            </div>
+          ) : membersQuery.isError ? (
+            <p className="text-[11px]" style={{ color: 'var(--color-danger)' }}>
+              Couldn’t load members
+            </p>
+          ) : channelMembers.length === 0 ? (
+            <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              No members yet
+            </p>
+          ) : showAllMembers ? (
+            <div className="max-h-48 space-y-1.5 overflow-y-auto pr-0.5">
+              {channelMembers.map((u) => (
+                <div key={u.id} className="flex items-center gap-2 rounded-lg px-1 py-1">
+                  <Avatar name={u.name} src={u.avatarUrl} size="xs" status={u.status} showStatus />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      {u.name}
+                      {u.id === currentUser.id ? ' (you)' : ''}
+                    </p>
+                    {u.title && (
+                      <p className="truncate text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                        {u.title}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              {previewMembers.map((u) => (
+                <div
+                  key={u.id}
+                  className="h-7 w-7 rounded-full overflow-hidden ring-1 ring-[var(--color-border)]"
+                  title={u.name}
+                >
+                  <Avatar name={u.name} src={u.avatarUrl} size="xs" status={u.status} />
+                </div>
+              ))}
+              {extraMembers > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllMembers(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{
+                    background: 'var(--color-elevated)',
+                    color: 'var(--color-text-secondary)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                  title="See all members"
+                >
+                  +{extraMembers}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Quick stats */}
+      {/* Channel media — opened from details, not header tabs */}
       <div className="py-1">
+        <p
+          className="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--color-text-tertiary)' }}
+        >
+          In this chat
+        </p>
         {actionRow(
           <FileText className="h-3.5 w-3.5" />,
           'Files',
@@ -280,7 +358,7 @@ export const DetailsPanel: React.FC = () => {
             'Add members',
             undefined,
             false,
-            () => setPeopleModalOpen(true),
+            () => setAddMembersModalOpen(true),
           )}
         {dividerRow}
         {actionRow(

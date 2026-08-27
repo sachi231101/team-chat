@@ -3,24 +3,19 @@ import {
   Hash,
   Lock,
   Star,
-  MoreHorizontal,
   PanelRight,
   Search,
-  FileEdit,
-  Plus,
   MessageSquare,
-  Sparkles,
   CheckSquare,
   BookmarkCheck,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
-import { useWorkspace, useContextActionsQuery, useContextDecisionsQuery } from '../../hooks';
+import { useWorkspace, useContextActionsQuery, useContextDecisionsQuery, useChannelMembersQuery } from '../../hooks';
 import { Avatar, Tooltip } from '../ui';
-import { NotificationsPopover } from './NotificationsPopover';
 import { SummarizeMenu } from './SummarizeMenu';
+import { AskAiMenu } from './AskAiMenu';
 
 export const AppHeader: React.FC = () => {
-  const [notifOpen, setNotifOpen] = useState(false);
   const [isSelfStarred, setIsSelfStarred] = useState(false);
 
   const {
@@ -35,6 +30,7 @@ export const AppHeader: React.FC = () => {
     setSearchModalOpen,
   } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
+  const membersQuery = useChannelMembersQuery(activeType === 'channel' ? activeId : null);
   const actionsQuery = useContextActionsQuery();
   const decisionsQuery = useContextDecisionsQuery();
 
@@ -67,13 +63,15 @@ export const AppHeader: React.FC = () => {
 
   const isSelfConvo = isSelf || (otherUser && otherUser.id === currentUser.id);
 
-  const tabs: { id: typeof chatHeaderTab; label: string; count?: number; icon?: any }[] = [
-    { id: 'messages', label: 'Messages' },
+  const tabs: {
+    id: 'messages' | 'actions' | 'decisions';
+    label: string;
+    count?: number;
+    icon?: typeof MessageSquare;
+  }[] = [
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'actions', label: 'Actions', count: actionCount, icon: CheckSquare },
     { id: 'decisions', label: 'Decisions', count: decisionCount, icon: BookmarkCheck },
-    { id: 'files', label: 'Files' },
-    { id: 'pinned', label: 'Pinned' },
-    { id: 'links', label: 'Links' },
   ];
 
   const iconBtn = (icon: React.ReactNode, label: string, onClick?: () => void, active?: boolean) => (
@@ -158,8 +156,13 @@ export const AppHeader: React.FC = () => {
               <p className="text-[11px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
                 {currentChannel.description
                   ? `${currentChannel.description} • `
-                  : 'Company-wide discussions • '}
-                <span>24 members</span>
+                  : ''}
+                <span>
+                  {membersQuery.data?.length ?? currentChannel.membersCount ?? 0}{' '}
+                  {(membersQuery.data?.length ?? currentChannel.membersCount ?? 0) === 1
+                    ? 'member'
+                    : 'members'}
+                </span>
               </p>
             </button>
           ) : isSelfConvo ? (
@@ -208,43 +211,63 @@ export const AppHeader: React.FC = () => {
         {/* Right: actions */}
         <div className="flex items-center gap-0.5 shrink-0">
           {iconBtn(<Search className="h-4 w-4" />, 'Search messages', () => setSearchModalOpen(true))}
+          <AskAiMenu
+            channelId={activeType === 'channel' ? activeId : undefined}
+            conversationId={activeType === 'conversation' ? activeId : undefined}
+          />
           <SummarizeMenu
             channelId={activeType === 'channel' ? activeId : undefined}
             conversationId={activeType === 'conversation' ? activeId : undefined}
           />
-          <div className="relative">
-            {iconBtn(<MoreHorizontal className="h-4 w-4" />, 'More', () => setNotifOpen(!notifOpen))}
-            <NotificationsPopover isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
-          </div>
           {iconBtn(<PanelRight className="h-4 w-4" />, detailsPanelOpen ? 'Hide details' : 'Details', toggleDetailsPanel, detailsPanelOpen)}
         </div>
       </div>
 
-      {/* Row 2: Tabs */}
-      <div className="flex items-center gap-1 px-4">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = chatHeaderTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setChatHeaderTab(tab.id)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors"
-              style={{
-                borderBottomColor: isActive ? 'var(--color-accent)' : 'transparent',
-                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-              }}
-            >
-              {Icon && <Icon className="w-3.5 h-3.5" />}
-              <span>{tab.label}</span>
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-stone-800 text-stone-300">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* Row 2: Primary tabs — utilities live in Details (Files / Pinned / Links) */}
+      <div className="flex items-center justify-between gap-2 px-4">
+        <div className="flex items-center gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = chatHeaderTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setChatHeaderTab(tab.id)}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors"
+                style={{
+                  borderBottomColor: isActive ? 'var(--color-accent)' : 'transparent',
+                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                }}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                <span>{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span
+                    className="px-1.5 py-0.2 rounded-full text-[10px] font-bold"
+                    style={{
+                      background: 'var(--color-elevated)',
+                      color: 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {(chatHeaderTab === 'files' || chatHeaderTab === 'pinned' || chatHeaderTab === 'links') && (
+          <button
+            type="button"
+            onClick={() => setChatHeaderTab('messages')}
+            className="mb-0.5 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors hover-surface"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Back to messages
+          </button>
+        )}
       </div>
     </header>
   );

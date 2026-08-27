@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NvidiaLlmService } from './nvidia-llm.service';
 import { AiContextService } from './ai-context.service';
@@ -90,6 +90,7 @@ export class AiDecisionsService {
   }
 
   async updateDecision(
+    user: RequestUser,
     id: string,
     data: {
       title?: string;
@@ -98,13 +99,25 @@ export class AiDecisionsService {
       impactedAreas?: string[];
     },
   ) {
+    const existing = await (this.prisma as any).decisionRecord.findFirst({
+      where: { id, workplaceId: user.workplaceId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Decision not found');
+    }
     return (this.prisma as any).decisionRecord.update({
       where: { id },
       data,
     });
   }
 
-  async deleteDecision(id: string) {
+  async deleteDecision(user: RequestUser, id: string) {
+    const existing = await (this.prisma as any).decisionRecord.findFirst({
+      where: { id, workplaceId: user.workplaceId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Decision not found');
+    }
     await (this.prisma as any).decisionRecord.delete({ where: { id } });
     return { success: true };
   }

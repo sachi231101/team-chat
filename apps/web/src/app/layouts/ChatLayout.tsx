@@ -7,9 +7,6 @@ import {
   AiBotPanel,
   CreateActionModal,
   ConversationToWorkModal,
-  DailyBriefingModal,
-  MultiAgentStudio,
-  AiLearningSettingsModal,
   RecordDecisionModal,
 } from '../../features/chat/components';
 import { ThreadPanel } from '../../features/threads/components';
@@ -21,11 +18,10 @@ import { useChatNavigation } from '../../hooks/useChatNavigation';
 import {
   SearchModal,
   CreateChannelModal,
-  ProfileModal,
-  SettingsModal,
   PeopleModal,
   InviteTeammatesModal,
   CreateSectionModal,
+  AddChannelMembersModal,
 } from '../../components/modals';
 
 export const ChatLayout: React.FC = () => {
@@ -71,14 +67,10 @@ export const ChatLayout: React.FC = () => {
       <CreateChannelModal />
       <CreateActionModal />
       <ConversationToWorkModal />
-      <DailyBriefingModal />
-      <MultiAgentStudio />
-      <AiLearningSettingsModal />
       <RecordDecisionModal />
-      <ProfileModal />
-      <SettingsModal />
       <PeopleModal />
       <InviteTeammatesModal />
+      <AddChannelMembersModal />
       <CreateSectionModal />
       <ErrorToast />
     </div>

@@ -1,12 +1,12 @@
 import {
   Injectable,
   NotFoundException,
-  InternalServerErrorException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService, UserContext } from '../../common/chat-access.service';
+import { throwInternal } from '../../common/safe-internal-error';
 import { RequestUser, DEFAULT_WORKPLACE_ID } from '../../common/request-user';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { ActionItem, ActionItemStatus } from '@team-chat/shared';
@@ -82,9 +82,7 @@ export class ActionsService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to fetch action items: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch action items', error);
     }
   }
 
@@ -167,9 +165,7 @@ export class ActionsService {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to create action item: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to create action item', error);
     }
   }
 
@@ -217,9 +213,7 @@ export class ActionsService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to update action item: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to update action item', error);
     }
   }
 
@@ -242,9 +236,7 @@ export class ActionsService {
       return { success: true };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to delete action item: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to delete action item', error);
     }
   }
 

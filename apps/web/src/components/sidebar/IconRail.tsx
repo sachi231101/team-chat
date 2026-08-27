@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Home,
   MessageSquare,
@@ -6,13 +6,10 @@ import {
   Files,
   Bookmark,
   Users,
-  Plus,
   Moon,
   Sun,
   Monitor,
   UserPlus,
-  Hash,
-  Sparkles,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
 import { useWorkspace, useChatMutations } from '../../hooks';
@@ -23,35 +20,18 @@ import { cn } from '../../lib/utils';
 export const IconRail: React.FC = () => {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<DOMRect | null>(null);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  const quickCreateRef = useRef<HTMLDivElement>(null);
 
   const {
     activeRailTab,
     setActiveRailTab,
     setActiveConversation,
     setPeopleModalOpen,
-    setCreateChannelModalOpen,
     setInviteModalOpen,
-    setDailyBriefingOpen,
-    setMultiAgentStudioOpen,
     theme,
     toggleTheme,
   } = useUiStore();
   const { currentUser, notifications, conversations } = useWorkspace();
   const { createConversation } = useChatMutations();
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (quickCreateRef.current && !quickCreateRef.current.contains(e.target as Node)) {
-        setQuickCreateOpen(false);
-      }
-    };
-    if (quickCreateOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [quickCreateOpen]);
 
   const unreadActivity = notifications.filter((n) => n.unread).length;
 
@@ -241,91 +221,6 @@ export const IconRail: React.FC = () => {
             <Users className="h-3.5 w-3.5" />
           </button>
         </Tooltip>
-
-        {/* 3. Plus (+) Quick Create Button with Popover Menu */}
-        <div ref={quickCreateRef} className="relative">
-          <Tooltip content="Create new..." side="right">
-            <button
-              onClick={() => setQuickCreateOpen((prev) => !prev)}
-              className={`flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-105 ${
-                quickCreateOpen ? 'bg-violet-600 text-white' : ''
-              }`}
-              style={quickCreateOpen ? undefined : railActionBtnStyle}
-              onMouseEnter={quickCreateOpen ? undefined : onRailActionEnter}
-              onMouseLeave={quickCreateOpen ? undefined : onRailActionLeave}
-              aria-label="Create new item"
-            >
-              <Plus className={`h-3.5 w-3.5 transition-transform ${quickCreateOpen ? 'rotate-45' : ''}`} />
-            </button>
-          </Tooltip>
-
-          {/* Quick Create Popover Menu */}
-          {quickCreateOpen && (
-            <div
-              className="absolute left-full bottom-0 ml-2 w-52 rounded-xl p-1.5 shadow-2xl z-50 border animate-in fade-in zoom-in-95"
-              style={{
-                background: 'var(--color-modal)',
-                borderColor: 'var(--color-border)',
-              }}
-            >
-              <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
-                Quick Actions
-              </p>
-
-              {/* Action 1: Invite Teammates */}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickCreateOpen(false);
-                  setInviteModalOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-300 hover:bg-violet-600/20 transition-colors text-left"
-              >
-                <UserPlus className="h-4 w-4 text-violet-400" />
-                <span>Invite teammates</span>
-              </button>
-
-              {/* Action 2: Create a channel */}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickCreateOpen(false);
-                  setCreateChannelModalOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
-              >
-                <Hash className="h-4 w-4 text-stone-400" />
-                <span>Create a channel</span>
-              </button>
-
-              {/* Action 3: New Direct Message */}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickCreateOpen(false);
-                  setPeopleModalOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
-              >
-                <MessageSquare className="h-4 w-4 text-stone-400" />
-                <span>New direct message</span>
-              </button>
-
-              {/* Action 4: Daily Briefing */}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickCreateOpen(false);
-                  setDailyBriefingOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-stone-200 hover:bg-white/5 transition-colors text-left"
-              >
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                <span>Daily Briefing</span>
-              </button>
-            </div>
-          )}
-        </div>
 
         {/* Theme toggle */}
         <Tooltip content={`${themeToggle.label}`} side="right">

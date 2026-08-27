@@ -13,6 +13,7 @@ import { useUiStore } from '../../../stores';
 import { useWorkspace, useActiveMessages } from '../../../hooks';
 import { Avatar } from '../../../components/ui';
 import { chatService } from '../../../services';
+import { resolveAssetUrl } from '../../../lib/assets';
 
 type FileFilter = 'all' | 'images' | 'documents' | 'media';
 
@@ -142,7 +143,7 @@ export const FilesView: React.FC = () => {
                       }}
                     >
                       <img
-                        src={file.url}
+                        src={resolveAssetUrl(file.url)}
                         alt={file.name}
                         className="h-full w-full object-cover opacity-80 mix-blend-overlay"
                       />
@@ -220,7 +221,7 @@ export const FilesView: React.FC = () => {
                           </button>
                         )}
                         <a
-                          href={file.url}
+                          href={resolveAssetUrl(file.url)}
                           target="_blank"
                           rel="noreferrer"
                           className="p-1 rounded transition-colors hover:bg-white/10"

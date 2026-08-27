@@ -42,4 +42,9 @@ export class CreateMessageDto {
   @ValidateNested({ each: true })
   @Type(() => AttachmentInputDto)
   attachments?: AttachmentInputDto[];
+
+  /** ISO datetime — message stays hidden until this time, then is published. */
+  @IsString()
+  @IsOptional()
+  scheduledFor?: string;
 }

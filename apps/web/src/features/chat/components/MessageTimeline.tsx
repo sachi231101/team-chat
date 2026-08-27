@@ -49,6 +49,19 @@ export const MessageTimeline: React.FC = () => {
     }
   }, [activeId, currentMessages.length, focusMessageId]);
 
+  const loadOlder = async () => {
+    const el = scrollerRef.current;
+    if (!el || !hasNextPage || isFetchingNextPage) return;
+    const prevHeight = el.scrollHeight;
+    const prevTop = el.scrollTop;
+    await fetchNextPage();
+    requestAnimationFrame(() => {
+      const next = scrollerRef.current;
+      if (!next) return;
+      next.scrollTop = prevTop + (next.scrollHeight - prevHeight);
+    });
+  };
+
   useEffect(() => {
     if (!focusMessageId) return;
     const el = document.getElementById(`msg-${focusMessageId}`);
@@ -100,11 +113,12 @@ export const MessageTimeline: React.FC = () => {
         const el = e.currentTarget;
         stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         if (el.scrollTop < 80 && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
+          void loadOlder();
         }
       }}
     >
-      {/* ── Channel / DM Welcome Banner ─────────────────── */}
+      {/* Welcome only when chat is empty */}
+      {!isLoading && currentMessages.length === 0 && (
       <div
         className="px-6 pt-8 pb-5"
         style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
@@ -194,21 +208,35 @@ export const MessageTimeline: React.FC = () => {
           </div>
         ) : null}
       </div>
+      )}
 
       {/* ── Message Groups ───────────────────────────────── */}
       <div className="pb-4">
         {isFetchingNextPage && (
-          <div className="py-2 text-center text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
-            Loading older messages…
+          <div className="space-y-3 px-6 py-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex gap-3 animate-pulse">
+                <div className="h-9 w-9 rounded-lg shrink-0" style={{ background: 'var(--color-surface)' }} />
+                <div className="flex-1 space-y-2 py-1">
+                  <div className="h-3 w-28 rounded" style={{ background: 'var(--color-surface)' }} />
+                  <div className="h-3 w-3/4 rounded" style={{ background: 'var(--color-surface)' }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div
-              className="h-7 w-7 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--color-accent) transparent var(--color-accent) var(--color-accent)' }}
-            />
-            <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Loading messages…</span>
+          <div className="space-y-4 px-6 py-8">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex gap-3 animate-pulse">
+                <div className="h-9 w-9 rounded-lg shrink-0" style={{ background: 'var(--color-surface)' }} />
+                <div className="flex-1 space-y-2 py-1">
+                  <div className="h-3 w-32 rounded" style={{ background: 'var(--color-surface)' }} />
+                  <div className="h-3 w-full rounded" style={{ background: 'var(--color-surface)' }} />
+                  <div className="h-3 w-2/3 rounded" style={{ background: 'var(--color-surface)' }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : groupedMessages.length === 0 ? (
           <div

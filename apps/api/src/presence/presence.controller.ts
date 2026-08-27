@@ -13,17 +13,20 @@ export class PresenceController {
     return this.presenceService.getAllPresence(user.workplaceId);
   }
 
-  @Patch(':userId?')
+  @Patch()
+  setOwnPresence(@CurrentUser() user: RequestUser, @Body() body: UpdatePresenceDto) {
+    return this.presenceService.setPresence(user.userId, body.status, body.statusMessage);
+  }
+
+  @Patch(':userId')
   setPresence(
     @CurrentUser() user: RequestUser,
     @Body() body: UpdatePresenceDto,
-    @Param('userId') userId?: string,
+    @Param('userId') userId: string,
   ) {
-    if (userId && userId !== user.userId && user.role !== 'admin') {
+    if (userId !== user.userId && user.role !== 'admin') {
       throw new ForbiddenException('You can only update your own presence');
     }
-    const targetId = userId || user.userId;
-    return this.presenceService.setPresence(targetId, body.status, body.statusMessage);
+    return this.presenceService.setPresence(userId, body.status, body.statusMessage);
   }
 }
-

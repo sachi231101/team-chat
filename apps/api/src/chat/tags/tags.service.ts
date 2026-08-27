@@ -1,11 +1,11 @@
 import {
   Injectable,
   NotFoundException,
-  InternalServerErrorException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService, UserContext } from '../../common/chat-access.service';
+import { throwInternal } from '../../common/safe-internal-error';
 import { RequestUser, DEFAULT_WORKPLACE_ID } from '../../common/request-user';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { MessageTag, MessageTagType, Message } from '@team-chat/shared';
@@ -94,9 +94,7 @@ export class TagsService {
       };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to toggle tag: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to toggle tag', error);
     }
   }
 
@@ -150,9 +148,7 @@ export class TagsService {
       return messages.map((m) => this.messagesService.mapMessageToDto(m as any));
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch decisions: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch decisions', error);
     }
   }
 }

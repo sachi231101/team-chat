@@ -9,4 +9,5 @@ export const queryKeys = {
   pinned: (type: string, id: string) => ['pinned', type, id] as const,
   actions: (type: string, id: string) => ['actions', type, id] as const,
   decisions: (type: string, id: string) => ['decisions', type, id] as const,
+  channelMembers: (channelId: string) => ['channel-members', channelId] as const,
 };

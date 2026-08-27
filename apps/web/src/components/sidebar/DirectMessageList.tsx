@@ -19,7 +19,7 @@ function dmRowStyle(isActive: boolean, hasUnread: boolean): React.CSSProperties 
 }
 
 export const DirectMessageList: React.FC = () => {
-  const { activeId, activeType, setActiveConversation, setPeopleModalOpen, setInviteModalOpen } = useUiStore();
+  const { activeId, activeType, setActiveConversation, setInviteModalOpen } = useUiStore();
   const { conversations, users, currentUser } = useWorkspace();
   const { createConversation } = useChatMutations();
 

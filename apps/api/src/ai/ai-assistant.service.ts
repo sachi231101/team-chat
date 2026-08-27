@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { basename, join } from 'path';
 import { RequestUser, normalizeUser } from '../common/request-user';
 import { PrismaService } from '../common/prisma.service';
+import { ChatAccessService } from '../common/chat-access.service';
 import { MessagesService } from '../chat/messages/messages.service';
 import { SearchService } from '../search/search.service';
 import { UPLOAD_DIR } from '../attachments/attachments.service';
@@ -31,6 +32,7 @@ export class AiAssistantService {
     private readonly context: AiContextService,
     private readonly search: SearchService,
     private readonly prisma: PrismaService,
+    private readonly chatAccess: ChatAccessService,
     @Inject(forwardRef(() => MessagesService))
     private readonly messages: MessagesService,
   ) {}
@@ -229,9 +231,30 @@ export class AiAssistantService {
     return { notes, postedMessageId };
   }
 
-  async summarizeFile(body: { name: string; url?: string; type?: string }) {
+  async summarizeFile(
+    user: { id: string; workplaceId: string },
+    body: { name: string; url?: string; type?: string },
+  ) {
     let extracted = '';
     if (body.url?.startsWith('/uploads/')) {
+      try {
+        await this.chatAccess.assertAttachmentAccess(user, body.url);
+      } catch {
+        return {
+          summary: await this.llm.complete([
+            {
+              role: 'system',
+              content:
+                'Summarize a shared workplace file from metadata only. Return a short summary.',
+            },
+            {
+              role: 'user',
+              content: `File: ${body.name}\nType: ${body.type || 'unknown'}\n(No accessible file contents.)`,
+            },
+          ]),
+        };
+      }
+
       const filePath = join(UPLOAD_DIR, basename(body.url));
       const textLike =
         !body.type ||

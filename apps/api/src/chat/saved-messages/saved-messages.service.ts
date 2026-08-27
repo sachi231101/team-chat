@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService, UserContext } from '../../common/chat-access.service';
+import { throwInternal } from '../../common/safe-internal-error';
 import { RequestUser, DEFAULT_WORKPLACE_ID } from '../../common/request-user';
 import { Message } from '@team-chat/shared';
 import { MessagesService } from '../messages/messages.service';
@@ -90,9 +91,7 @@ export class SavedMessagesService {
       return { saved: !existing, ids: await this.listIds(user) };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to toggle saved message: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to toggle saved message', error);
     }
   }
 }

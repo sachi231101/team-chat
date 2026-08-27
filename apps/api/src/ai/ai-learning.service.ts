@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NvidiaLlmService } from './nvidia-llm.service';
 import type { RequestUser } from '../common/request-user';
@@ -93,14 +93,22 @@ export class AiLearningService {
     });
   }
 
-  async toggleRule(id: string, active: boolean) {
+  async toggleRule(user: RequestUser, id: string, active: boolean) {
+    const existing = await this.prisma.aiLearningRule.findFirst({
+      where: { id, workplaceId: user.workplaceId },
+    });
+    if (!existing) throw new NotFoundException('Rule not found');
     return this.prisma.aiLearningRule.update({
       where: { id },
       data: { active },
     });
   }
 
-  async deleteRule(id: string) {
+  async deleteRule(user: RequestUser, id: string) {
+    const existing = await this.prisma.aiLearningRule.findFirst({
+      where: { id, workplaceId: user.workplaceId },
+    });
+    if (!existing) throw new NotFoundException('Rule not found');
     await this.prisma.aiLearningRule.delete({ where: { id } });
     return { success: true };
   }

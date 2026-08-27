@@ -16,6 +16,14 @@ import { DEFAULT_CURRENT_USER, getStoredUserId, setStoredUserId } from '../lib/c
 
 import { useUiStore } from '../stores';
 
+export function useChannelMembersQuery(channelId?: string | null) {
+  return useQuery({
+    queryKey: queryKeys.channelMembers(channelId || ''),
+    queryFn: () => chatService.getChannelMembers(channelId!),
+    enabled: Boolean(channelId),
+  });
+}
+
 export function useUsersQuery() {
   return useQuery({
     queryKey: queryKeys.users,
@@ -82,6 +90,7 @@ export function useContextActionsQuery(status?: string) {
     queryFn: () =>
       chatService.getActionItems({
         channelId: activeType === 'channel' ? activeId : undefined,
+        conversationId: activeType === 'conversation' ? activeId : undefined,
         status: status && status !== 'ALL' ? status : undefined,
       }),
     enabled: Boolean(activeId),
@@ -240,8 +249,10 @@ export function useChatMutations() {
         attachments?: { name: string; url: string; size: number; type: string }[];
         parentMessageId?: string;
         clientMessageId?: string;
+        scheduledFor?: string;
       }) => {
         const clientMessageId = input.clientMessageId || `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const isScheduled = Boolean(input.scheduledFor);
         const outboxEntry = {
           clientMessageId,
           content: input.content,
@@ -253,7 +264,7 @@ export function useChatMutations() {
           createdAt: new Date().toISOString(),
         };
 
-        addOutboxItem(outboxEntry);
+        if (!isScheduled) addOutboxItem(outboxEntry);
 
         try {
           const res = await chatService.sendMessage({
@@ -261,13 +272,14 @@ export function useChatMutations() {
             content: input.content,
             attachments: input.attachments,
             parentMessageId: input.parentMessageId,
+            scheduledFor: input.scheduledFor,
             channelId: activeType === 'channel' ? activeId : undefined,
             conversationId: activeType === 'conversation' ? activeId : undefined,
           });
-          removeOutboxItem(clientMessageId);
+          if (!isScheduled) removeOutboxItem(clientMessageId);
           return res;
         } catch (err: any) {
-          updateOutboxItem(clientMessageId, 'failed', err.message);
+          if (!isScheduled) updateOutboxItem(clientMessageId, 'failed', err.message);
           throw err;
         }
       },
@@ -375,9 +387,10 @@ export function useChatMutations() {
     addChannelMembers: useMutation({
       mutationFn: ({ channelId, userIds }: { channelId: string; userIds: string[] }) =>
         chatService.addChannelMembers(channelId, userIds),
-      onSuccess: () => {
+      onSuccess: (_data, vars) => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.channels });
         void queryClient.invalidateQueries({ queryKey: queryKeys.users });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.channelMembers(vars.channelId) });
       },
     }),
     leaveChannel: useMutation({
@@ -388,6 +401,7 @@ export function useChatMutations() {
           (c) => c.id !== channelId,
         );
         void queryClient.invalidateQueries({ queryKey: queryKeys.channels });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.channelMembers(channelId) });
         if (remaining.length > 0) {
           setActiveChannel(remaining[0].id);
         } else {

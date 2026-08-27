@@ -1,8 +1,10 @@
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ServerOptions } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { createClient } from 'redis';
+import { createClient, type RedisClientType } from 'redis';
 import { Logger } from '@nestjs/common';
+
+const REDIS_CONNECT_TIMEOUT_MS = Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 3000);
 
 export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter> | null = null;
@@ -22,9 +24,18 @@ export class RedisIoAdapter extends IoAdapter {
       return;
     }
 
+    let pubClient: RedisClientType | null = null;
+    let subClient: RedisClientType | null = null;
+
     try {
-      const pubClient = createClient({ url: redisUrl });
-      const subClient = pubClient.duplicate();
+      pubClient = createClient({
+        url: redisUrl,
+        socket: {
+          connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+          reconnectStrategy: false,
+        },
+      });
+      subClient = pubClient.duplicate();
 
       pubClient.on('error', (err) => {
         this.logger.warn(`Redis Pub client error: ${(err as Error).message}`);
@@ -33,7 +44,21 @@ export class RedisIoAdapter extends IoAdapter {
         this.logger.warn(`Redis Sub client error: ${(err as Error).message}`);
       });
 
-      await Promise.all([pubClient.connect(), subClient.connect()]);
+      await Promise.race([
+        Promise.all([pubClient.connect(), subClient.connect()]),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `Redis connection timed out after ${REDIS_CONNECT_TIMEOUT_MS}ms`,
+                ),
+              ),
+            REDIS_CONNECT_TIMEOUT_MS,
+          );
+        }),
+      ]);
+
       this.adapterConstructor = createAdapter(pubClient, subClient);
       this.logger.log(`Socket.IO Redis adapter connected to ${redisUrl}`);
     } catch (error) {
@@ -41,6 +66,10 @@ export class RedisIoAdapter extends IoAdapter {
         `Failed to connect to Redis (${(error as Error).message}). Falling back to in-memory adapter.`,
       );
       this.adapterConstructor = null;
+      await Promise.allSettled([
+        pubClient?.isOpen ? pubClient.quit() : Promise.resolve(),
+        subClient?.isOpen ? subClient.quit() : Promise.resolve(),
+      ]);
     }
   }
 

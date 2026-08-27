@@ -14,10 +14,7 @@ import { PresenceService } from '../../presence/presence.service';
 import { RealtimeService } from '../realtime.service';
 import { ChatAccessService } from '../../common/chat-access.service';
 import { UserStatus } from '@team-chat/shared';
-import {
-  DEFAULT_MOCK_USER_ID,
-  DEFAULT_WORKPLACE_ID,
-} from '../../common/request-user';
+import { resolveMockIdentityFromHandshake } from '../../common/mock-identity';
 
 function allowedOrigins(): string[] {
   const raw = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || '';
@@ -51,14 +48,13 @@ export class ChatGateway
   }
 
   handleConnection(client: Socket) {
-    const userId =
-      (client.handshake.auth?.userId as string) ||
-      (client.handshake.headers['x-user-id'] as string) ||
-      DEFAULT_MOCK_USER_ID;
-    const workplaceId =
-      (client.handshake.auth?.workplaceId as string) ||
-      (client.handshake.headers['x-workplace-id'] as string) ||
-      DEFAULT_WORKPLACE_ID;
+    const identity = resolveMockIdentityFromHandshake({
+      authUserId: client.handshake.auth?.userId,
+      authWorkplaceId: client.handshake.auth?.workplaceId,
+      headers: client.handshake.headers as Record<string, unknown>,
+    });
+    const userId = identity.userId;
+    const workplaceId = identity.workplaceId;
     client.data.userId = userId;
     client.data.workplaceId = workplaceId;
 

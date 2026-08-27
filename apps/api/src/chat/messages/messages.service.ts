@@ -1,11 +1,13 @@
 import {
   Injectable,
   NotFoundException,
-  InternalServerErrorException,
   BadRequestException,
   ForbiddenException,
   Inject,
   forwardRef,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import {
   Prisma,
@@ -18,6 +20,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService, UserContext } from '../../common/chat-access.service';
+import { throwInternal } from '../../common/safe-internal-error';
 import { RequestUser, DEFAULT_WORKPLACE_ID } from '../../common/request-user';
 import { Message } from '@team-chat/shared';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -64,7 +67,10 @@ const MESSAGE_INCLUDE = {
 
 
 @Injectable()
-export class MessagesService {
+export class MessagesService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(MessagesService.name);
+  private scheduleTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatAccess: ChatAccessService,
@@ -73,6 +79,23 @@ export class MessagesService {
     @Inject(forwardRef(() => AiOrchestratorService))
     private readonly ai: AiOrchestratorService,
   ) {}
+
+  onModuleInit(): void {
+    this.scheduleTimer = setInterval(() => {
+      void this.publishDueScheduledMessages().catch((err) =>
+        this.logger.warn(`Scheduled message publish failed: ${(err as Error).message}`),
+      );
+    }, 20_000);
+  }
+
+  onModuleDestroy(): void {
+    if (this.scheduleTimer) clearInterval(this.scheduleTimer);
+  }
+
+  /** Pending schedules stay hidden until the publisher clears `scheduledFor`. */
+  private visibleMessageFilter(): Prisma.MessageWhereInput {
+    return { scheduledFor: null };
+  }
 
   private extractUser(userOrId: UserContext | string): { userId: string; workplaceId: string } {
     if (typeof userOrId === 'string') {
@@ -106,6 +129,7 @@ export class MessagesService {
       const where: Prisma.MessageWhereInput = {
         deletedAt: null,
         parentMessageId: null,
+        ...this.visibleMessageFilter(),
       };
       if (channelId) where.channelId = channelId;
       if (conversationId) where.conversationId = conversationId;
@@ -142,9 +166,7 @@ export class MessagesService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to fetch messages: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch messages', error);
     }
   }
 
@@ -169,6 +191,7 @@ export class MessagesService {
 
       const where: Prisma.MessageWhereInput = {
         deletedAt: null,
+        ...this.visibleMessageFilter(),
       };
       if (channelId) where.channelId = channelId;
       if (conversationId) where.conversationId = conversationId;
@@ -188,9 +211,7 @@ export class MessagesService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to sync messages: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to sync messages', error);
     }
   }
 
@@ -212,9 +233,7 @@ export class MessagesService {
       return this.mapMessageToDto(m as any);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch message ${id}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch message', error);
     }
   }
 
@@ -254,6 +273,21 @@ export class MessagesService {
       throw new BadRequestException('Message must include text or at least one attachment');
     }
 
+    let scheduledFor: Date | null = null;
+    if (body.scheduledFor) {
+      const when = new Date(body.scheduledFor);
+      if (Number.isNaN(when.getTime())) {
+        throw new BadRequestException('scheduledFor must be a valid ISO datetime');
+      }
+      if (when.getTime() <= Date.now() + 30_000) {
+        throw new BadRequestException('scheduledFor must be at least 30 seconds in the future');
+      }
+      if (when.getTime() > Date.now() + 365 * 24 * 60 * 60 * 1000) {
+        throw new BadRequestException('scheduledFor cannot be more than 1 year ahead');
+      }
+      scheduledFor = when;
+    }
+
     try {
       const m = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
@@ -264,6 +298,9 @@ export class MessagesService {
             channelId: body.channelId,
             conversationId: body.conversationId,
             parentMessageId: body.parentMessageId,
+            scheduledFor,
+            // Keep timeline order correct when the message becomes visible
+            ...(scheduledFor ? { createdAt: scheduledFor } : {}),
             attachments:
               body.attachments && body.attachments.length > 0
                 ? {
@@ -279,24 +316,30 @@ export class MessagesService {
           include: MESSAGE_INCLUDE,
         });
 
-        if (body.conversationId) {
-          await tx.conversation.update({
-            where: { id: body.conversationId },
-            data: { updatedAt: new Date() },
-          });
-        }
+        if (!scheduledFor) {
+          if (body.conversationId) {
+            await tx.conversation.update({
+              where: { id: body.conversationId },
+              data: { updatedAt: new Date() },
+            });
+          }
 
-        if (body.channelId) {
-          await tx.channel.update({
-            where: { id: body.channelId },
-            data: { updatedAt: new Date() },
-          });
+          if (body.channelId) {
+            await tx.channel.update({
+              where: { id: body.channelId },
+              data: { updatedAt: new Date() },
+            });
+          }
         }
 
         return created;
       });
 
       const dto = this.mapMessageToDto(m as any);
+      if (scheduledFor) {
+        return dto;
+      }
+
       this.realtime.emitToChat(dto, 'message:created', dto);
       void this.mentions.notifyFromMessage(dto);
       this.ai.onMessageCreated(dto);
@@ -305,10 +348,53 @@ export class MessagesService {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to create message: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to create message', error);
     }
+  }
+
+  async publishDueScheduledMessages(): Promise<number> {
+    const due = await this.prisma.message.findMany({
+      where: {
+        deletedAt: null,
+        scheduledFor: { lte: new Date() },
+      },
+      include: MESSAGE_INCLUDE,
+      take: 50,
+      orderBy: { scheduledFor: 'asc' },
+    });
+
+    let published = 0;
+    for (const row of due) {
+      const updated = await this.prisma.message.update({
+        where: { id: row.id },
+        data: {
+          scheduledFor: null,
+          createdAt: row.scheduledFor ?? new Date(),
+          updatedAt: new Date(),
+        },
+        include: MESSAGE_INCLUDE,
+      });
+
+      if (updated.channelId) {
+        await this.prisma.channel.update({
+          where: { id: updated.channelId },
+          data: { updatedAt: new Date() },
+        });
+      }
+      if (updated.conversationId) {
+        await this.prisma.conversation.update({
+          where: { id: updated.conversationId },
+          data: { updatedAt: new Date() },
+        });
+      }
+
+      const dto = this.mapMessageToDto(updated as any);
+      this.realtime.emitToChat(dto, 'message:created', dto);
+      void this.mentions.notifyFromMessage(dto);
+      this.ai.onMessageCreated(dto);
+      published += 1;
+    }
+    return published;
   }
 
   async update(id: string, content: string, userOrId: UserContext | string): Promise<Message> {
@@ -328,9 +414,7 @@ export class MessagesService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to update message ${id}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to update message', error);
     }
   }
 
@@ -352,9 +436,7 @@ export class MessagesService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Failed to delete message ${id}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to delete message', error);
     }
   }
 
@@ -380,9 +462,7 @@ export class MessagesService {
       return dto;
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to toggle pin for message ${id}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to toggle pin', error);
     }
   }
 
@@ -425,9 +505,7 @@ export class MessagesService {
       return dto;
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to toggle reaction on message ${messageId}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to toggle reaction', error);
     }
   }
 
@@ -449,9 +527,7 @@ export class MessagesService {
       return replies.map((r) => this.mapMessageToDto(r as any));
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch replies: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch replies', error);
     }
   }
 
@@ -478,9 +554,7 @@ export class MessagesService {
       return { success: true };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to mark message as read: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to mark message as read', error);
     }
   }
 
@@ -522,6 +596,7 @@ export class MessagesService {
     const where: Prisma.MessageWhereInput = {
       pinned: true,
       deletedAt: null,
+      ...this.visibleMessageFilter(),
     };
     if (channelId) where.channelId = channelId;
     if (conversationId) where.conversationId = conversationId;
@@ -547,6 +622,7 @@ export class MessagesService {
       conversationId: m.conversationId ?? undefined,
       parentMessageId: m.parentMessageId ?? undefined,
       pinned: m.pinned,
+      scheduledFor: m.scheduledFor?.toISOString(),
       editedAt: m.editedAt?.toISOString(),
       replyCount: m.replies ? m.replies.length : 0,
       lastReplyAt:

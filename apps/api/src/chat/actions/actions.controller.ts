@@ -26,12 +26,14 @@ export class ActionsController {
   async findAll(
     @CurrentUser() user: RequestUser,
     @Query('channelId') channelId?: string,
+    @Query('conversationId') conversationId?: string,
     @Query('assigneeId') assigneeId?: string,
     @Query('status') status?: ActionItemStatus,
     @Query('messageId') messageId?: string,
   ) {
     return this.actionsService.findAll(user, {
       channelId,
+      conversationId,
       assigneeId,
       status,
       messageId,

@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException, InternalServerErrorException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService } from '../../common/chat-access.service';
 import { RequestUser } from '../../common/request-user';
+import { throwInternal } from '../../common/safe-internal-error';
 import { Channel, User } from '@team-chat/shared';
 import { ChannelType, ChannelMemberRole, Prisma } from '@prisma/client';
 
@@ -39,9 +46,7 @@ export class ChannelsService {
         membersCount: c.members.length,
       }));
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to fetch channels: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch channels', error);
     }
   }
 
@@ -71,9 +76,7 @@ export class ChannelsService {
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch channel ${id}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to fetch channel`, error);
     }
   }
 
@@ -87,7 +90,7 @@ export class ChannelsService {
   }): Promise<Channel> {
     const creatorId = data.createdById;
     if (!creatorId) {
-      throw new InternalServerErrorException('createdById is required');
+      throwInternal('createdById is required');
     }
     const wpId = data.workplaceId || 'wp-teamchat-main';
     const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
@@ -135,9 +138,7 @@ export class ChannelsService {
       ) {
         throw new ConflictException(`Channel #${normalizedName} already exists`);
       }
-      throw new InternalServerErrorException(
-        `Failed to create channel: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to create channel', error);
     }
   }
 
@@ -166,18 +167,17 @@ export class ChannelsService {
       }));
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch channel members: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch channel members', error);
     }
   }
 
   async addMembers(channelId: string, userIds: string[], user?: RequestUser): Promise<User[]> {
     try {
-      if (user) {
-        await this.chatAccess.assertCanManageChannelMembers(user, channelId);
-        await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, userIds);
+      if (!user) {
+        throw new UnauthorizedException('Authentication required');
       }
+      await this.chatAccess.assertCanManageChannelMembers(user, channelId);
+      await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, userIds);
 
       await this.prisma.$transaction(
         userIds.map((userId) =>
@@ -193,27 +193,35 @@ export class ChannelsService {
 
       return this.getMembers(channelId, user);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to add channel members: ${(error as Error).message}`,
-      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      throwInternal('Failed to add channel members', error);
     }
   }
 
-  async removeMember(channelId: string, targetUserId: string, user?: RequestUser): Promise<{ success: boolean }> {
+  async removeMember(
+    channelId: string,
+    targetUserId: string,
+    user?: RequestUser,
+  ): Promise<{ success: boolean }> {
     try {
-      if (user) {
-        const channel = await this.chatAccess.assertChannelAccess(user, channelId);
-        // Verify target user belongs to same workplace
-        await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, [targetUserId]);
+      if (!user) {
+        throw new UnauthorizedException('Authentication required');
+      }
 
-        // If removing someone else, must be admin
-        if (user.userId !== targetUserId) {
-          const callerMember = channel.members.find((m) => m.userId === user.userId);
-          if (callerMember?.role !== ChannelMemberRole.ADMIN && channel.createdById !== user.userId) {
-            throw new ForbiddenException('Only channel admins can remove other members');
-          }
-        }
+      await this.chatAccess.assertUsersBelongToWorkplace(user.workplaceId, [targetUserId]);
+
+      if (user.userId === targetUserId) {
+        // Self-leave: must be a member (admin not required)
+        await this.chatAccess.assertChannelMembership(user, channelId);
+      } else {
+        // Removing others: admin / creator only
+        await this.chatAccess.assertCanManageChannelMembers(user, channelId);
       }
 
       await this.prisma.channelMember.deleteMany({
@@ -221,11 +229,14 @@ export class ChannelsService {
       });
       return { success: true };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to remove channel member: ${(error as Error).message}`,
-      );
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      throwInternal('Failed to remove channel member', error);
     }
   }
 }
-

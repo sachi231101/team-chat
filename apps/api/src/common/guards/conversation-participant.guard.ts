@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
 } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders, RequestUser } from '../request-user';
+import { attachMockIdentity } from '../mock-identity';
 
 @Injectable()
 export class ConversationParticipantGuard implements CanActivate {
@@ -12,8 +13,7 @@ export class ConversationParticipantGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
-    req.user = user;
+    const user = attachMockIdentity(req);
 
     const conversationId =
       req.params?.conversationId ||
@@ -21,12 +21,11 @@ export class ConversationParticipantGuard implements CanActivate {
       req.query?.conversationId ||
       req.body?.conversationId;
 
-    if (!conversationId) {
-      return true;
+    if (!conversationId || typeof conversationId !== 'string') {
+      throw new BadRequestException('conversationId is required');
     }
 
     await this.chatAccess.assertConversationAccess(user, conversationId);
     return true;
   }
 }
-

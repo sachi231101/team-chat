@@ -21,6 +21,7 @@ export class PrismaService
       this.isConnected = true;
       this.logger.log('✅ PostgreSQL database connected successfully via Prisma');
       await this.seedInitialWorkspaceData();
+      await this.ensureAiAgentUsers();
       await this.provisionMissingDefaultChannels();
     } catch (error) {
       this.isConnected = false;
@@ -306,6 +307,79 @@ export class PrismaService
     }
   }
 
+  /** Agents must exist even if the DB was seeded before they were added. */
+  private async ensureAiAgentUsers() {
+    const agents = [
+      {
+        id: 'usr-agent-research',
+        name: 'ResearchAgent',
+        email: 'research.agent@teamchat.ai',
+        avatarUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80',
+        title: 'AI Research Assistant',
+        status: UserStatus.ONLINE,
+        statusMessage: 'Ready for deep technical research',
+        workplaceId: 'wp-teamchat-main',
+      },
+      {
+        id: 'usr-agent-meeting',
+        name: 'MeetingAgent',
+        email: 'meeting.agent@teamchat.ai',
+        avatarUrl: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=150&auto=format&fit=crop&q=80',
+        title: 'AI Meeting & Agenda Lead',
+        status: UserStatus.ONLINE,
+        statusMessage: 'Synthesizing action items',
+        workplaceId: 'wp-teamchat-main',
+      },
+      {
+        id: 'usr-agent-support',
+        name: 'SupportAgent',
+        email: 'support.agent@teamchat.ai',
+        avatarUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80',
+        title: 'AI Support & Incident Copilot',
+        status: UserStatus.ONLINE,
+        statusMessage: 'Monitoring system health',
+        workplaceId: 'wp-teamchat-main',
+      },
+      {
+        id: 'usr-agent-workspace',
+        name: 'WorkspaceAgent',
+        email: 'workspace.agent@teamchat.ai',
+        avatarUrl: 'https://images.unsplash.com/photo-1639322537228-f710d846310a?w=150&auto=format&fit=crop&q=80',
+        title: 'Personal workspace assistant',
+        status: UserStatus.ONLINE,
+        statusMessage: 'Catch-up, search, and drafts — DM only',
+        workplaceId: 'wp-teamchat-main',
+      },
+      {
+        id: 'usr-agent-task',
+        name: 'TaskCoordinator',
+        email: 'task.coordinator@teamchat.ai',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        title: 'AI Task Coordinator',
+        status: UserStatus.ONLINE,
+        statusMessage: 'Turning discussions into actionable work',
+        workplaceId: 'wp-teamchat-main',
+      },
+    ];
+
+    try {
+      for (const agent of agents) {
+        await this.user.upsert({
+          where: { id: agent.id },
+          create: agent,
+          update: {
+            name: agent.name,
+            title: agent.title,
+            statusMessage: agent.statusMessage,
+            status: agent.status,
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.warn(`AI agent upsert notice: ${(err as Error).message}`);
+    }
+  }
+
   /** If the workspace already has users but is missing #general / #random / #announcements, create them. */
   private async provisionMissingDefaultChannels() {
     try {
@@ -325,9 +399,6 @@ export class PrismaService
         await provisionUserPublicChannels(this, user.id, workplaceId);
       }
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7478/ingest/00f10b65-0a04-4e60-b5e9-07d47622c725',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d06bbf'},body:JSON.stringify({sessionId:'d06bbf',runId:'post-fix',hypothesisId:'A',location:'prisma.service.ts:provisionMissingDefaultChannels',message:'default channel provision failed',data:{error:(err as Error).message},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       this.logger.warn(`Default channel provision notice: ${(err as Error).message}`);
     }
   }

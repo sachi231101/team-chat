@@ -7,21 +7,19 @@ import {
   Link as LinkIcon,
   List,
   ListOrdered,
-  Indent,
   Code,
-  LayoutGrid,
   Plus,
   Type,
   Smile,
   AtSign,
-  Image,
-  Mic,
   Slash,
   Send,
   X,
   FileText,
   Sparkles,
   BarChart2,
+  ChevronDown,
+  Clock,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
 import { useWorkspace, useChatMutations, useActiveMessages } from '../../../hooks';
@@ -32,7 +30,6 @@ import { Tooltip } from '../../../components/ui';
 import { MentionDropdown, MentionItem } from './MentionDropdown';
 import { SlashCommandDropdown, SlashCommandItem } from './SlashCommandDropdown';
 import { ChannelDropdown } from './ChannelDropdown';
-import { SmartRouteBadge } from './SmartRouteBadge';
 import { CreatePollModal } from './CreatePollModal';
 import { Channel } from '@team-chat/shared';
 
@@ -80,6 +77,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showAiAssist, setShowAiAssist] = useState(false);
   const [isAiRewriting, setIsAiRewriting] = useState(false);
+  const [aiPreview, setAiPreview] = useState<{
+    previousHtml: string;
+    proposedHtml: string;
+    action: string;
+  } | null>(null);
+  const [showFormatBar, setShowFormatBar] = useState(false);
   const [marks, setMarks] = useState<Marks>({
     bold: false,
     italic: false,
@@ -95,6 +98,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pollModalOpen, setPollModalOpen] = useState(false);
+  const [showSendMenu, setShowSendMenu] = useState(false);
+  const [customSchedule, setCustomSchedule] = useState('');
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
 
   const pickFiles = (accept: string) => {
 
@@ -104,7 +110,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     input.click();
   };
 
-  const { activeId, activeType, setEditingMessageId } = useUiStore();
+  const { activeId, activeType, setEditingMessageId, sendWithEnter } = useUiStore();
   const { channels, conversations, users, currentUser } = useWorkspace();
   const { messages } = useActiveMessages();
   const { sendMessage } = useChatMutations();
@@ -290,7 +296,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         parentMessageId,
       });
       if (result.text) {
-        setEditorHtml(markdownToHtml(result.text));
+        const previousHtml = editorRef.current?.innerHTML || '';
+        const proposedHtml = markdownToHtml(result.text);
+        setAiPreview({ previousHtml, proposedHtml, action });
+        setEditorHtml(proposedHtml);
         editorRef.current?.focus();
       }
     } catch (err) {
@@ -300,23 +309,81 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   };
 
-  const handleSend = () => {
+  const acceptAiPreview = () => setAiPreview(null);
+
+  const undoAiPreview = () => {
+    if (!aiPreview) return;
+    setEditorHtml(aiPreview.previousHtml);
+    setAiPreview(null);
+    editorRef.current?.focus();
+  };
+
+  const handleSend = (scheduledFor?: string) => {
     if (!canSend) return;
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     sendTypingIndicator(false);
 
     const markdown = htmlToMarkdown(editorRef.current?.innerHTML || '').trim() || plain.trim();
-    sendMessage.mutate({
-      content: markdown,
-      attachments: attachedFiles,
-      parentMessageId,
-    });
+    sendMessage.mutate(
+      {
+        content: markdown,
+        attachments: attachedFiles,
+        parentMessageId,
+        scheduledFor,
+      },
+      {
+        onSuccess: () => {
+          if (scheduledFor) {
+            const label = new Date(scheduledFor).toLocaleString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            });
+            setScheduleNotice(`Scheduled for ${label}`);
+            window.setTimeout(() => setScheduleNotice(null), 4000);
+          }
+        },
+      },
+    );
 
+    setShowSendMenu(false);
+    setAiPreview(null);
     setAttachedFiles([]);
     setMentionQuery(null);
     setPlain('');
     if (editorRef.current) editorRef.current.innerHTML = '';
     if (typeof window !== 'undefined') localStorage.removeItem(draftKey);
+  };
+
+  const schedulePresets = () => {
+    const now = new Date();
+    const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const tomorrow9 = new Date(now);
+    tomorrow9.setDate(tomorrow9.getDate() + 1);
+    tomorrow9.setHours(9, 0, 0, 0);
+    if (tomorrow9.getTime() <= now.getTime()) tomorrow9.setDate(tomorrow9.getDate() + 1);
+    const nextMonday9 = new Date(now);
+    const day = nextMonday9.getDay();
+    const daysUntilMon = day === 0 ? 1 : day === 1 ? 7 : 8 - day;
+    nextMonday9.setDate(nextMonday9.getDate() + daysUntilMon);
+    nextMonday9.setHours(9, 0, 0, 0);
+    return [
+      { id: '1h', label: 'In 1 hour', at: inOneHour },
+      { id: 'tm9', label: 'Tomorrow at 9:00 AM', at: tomorrow9 },
+      { id: 'mon9', label: 'Next Monday at 9:00 AM', at: nextMonday9 },
+    ];
+  };
+
+  const scheduleCustom = () => {
+    if (!customSchedule) return;
+    const when = new Date(customSchedule);
+    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now() + 30_000) {
+      useUiStore.getState().setError('Pick a time at least 30 seconds from now.');
+      return;
+    }
+    handleSend(when.toISOString());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -370,8 +437,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+      if (sendWithEnter) {
+        e.preventDefault();
+        handleSend();
+      } else if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        handleSend();
+      }
     }
   };
 
@@ -515,15 +587,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         />
       )}
 
-      <SmartRouteBadge draftText={plain} onInsertText={(t) => insertPlain(t)} />
-
       <div
-        className="overflow-hidden rounded-xl transition-all"
+        className="rounded-xl transition-all"
         style={{
           background: 'var(--color-input)',
           border: '1px solid var(--color-border)',
         }}
       >
+        {showFormatBar && (
         <div
           className="flex items-center gap-0.5 px-2 py-1.5"
           style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
@@ -546,19 +617,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           {divider}
           {fmtBtn(<ListOrdered className="h-4 w-4" />, 'Numbered list', () => exec('insertOrderedList'))}
           {fmtBtn(<List className="h-4 w-4" />, 'Bulleted list', () => exec('insertUnorderedList'))}
-          {fmtBtn(<Indent className="h-4 w-4" />, 'Indent', () => exec('indent'))}
-          {divider}
           {fmtBtn(<Code className="h-4 w-4" />, 'Code', () => exec('formatBlock', 'pre'))}
-          {fmtBtn(<LayoutGrid className="h-4 w-4" />, 'Table', () => {
-            editorRef.current?.focus();
-            document.execCommand(
-              'insertHTML',
-              false,
-              '<table style="width:100%;border-collapse:collapse"><tr><td style="border:1px solid currentColor;padding:4px"> </td><td style="border:1px solid currentColor;padding:4px"> </td></tr></table>',
-            );
-            syncFromEditor();
-          })}
         </div>
+        )}
 
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-3 pt-2">
@@ -614,6 +675,33 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             className="composer-editor w-full min-h-[56px] max-h-[220px] overflow-y-auto bg-transparent px-3 py-2.5 text-[15px] leading-relaxed focus:outline-none"
             style={{ color: 'var(--color-text-primary)' }}
           />
+          {aiPreview && (
+            <div
+              className="flex items-center gap-2 border-t px-3 py-2"
+              style={{ borderColor: 'var(--color-border-subtle)', background: 'var(--color-accent-muted)' }}
+            >
+              <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+              <span className="min-w-0 flex-1 truncate text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                AI rewrite preview — accept to keep, or undo
+              </span>
+              <button
+                type="button"
+                onClick={undoAiPreview}
+                className="rounded-md px-2 py-1 text-[11px] font-semibold hover-surface"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                onClick={acceptAiPreview}
+                className="rounded-md px-2 py-1 text-[11px] font-semibold text-white"
+                style={{ background: 'var(--color-accent)' }}
+              >
+                Accept
+              </button>
+            </div>
+          )}
         </div>
 
         <div
@@ -626,8 +714,44 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               'Attach files',
               () => pickFiles('image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip'),
             )}
-            {fmtBtn(<Type className="h-4 w-4" />, 'Text formatting', () => editorRef.current?.focus())}
-            {fmtBtn(<Smile className="h-4 w-4" />, 'Emoji', () => setShowEmoji(!showEmoji))}
+            {fmtBtn(
+              <Type className="h-4 w-4" />,
+              showFormatBar ? 'Hide formatting' : 'Show formatting',
+              () => setShowFormatBar((v) => !v),
+              showFormatBar,
+            )}
+            <div className="relative">
+              {fmtBtn(<Smile className="h-4 w-4" />, 'Emoji', () => setShowEmoji(!showEmoji))}
+              {showEmoji && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowEmoji(false)} />
+                  <div
+                    className="absolute bottom-full left-0 z-40 mb-2 w-[13.75rem] rounded-xl p-2 shadow-2xl animate-in zoom-in-95"
+                    style={{
+                      background: 'var(--color-modal)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div className="grid grid-cols-6 gap-0.5">
+                      {EMOJI_LIST.map((em) => (
+                        <button
+                          key={em}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            insertPlain(em);
+                            setShowEmoji(false);
+                          }}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-xl leading-none transition-all hover:scale-110 hover-surface-strong"
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             {fmtBtn(<AtSign className="h-4 w-4" />, 'Mention', () => insertPlain('@'))}
             <div className="relative">
               {fmtBtn(
@@ -639,7 +763,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowAiAssist(false)} />
                   <div
-                    className="absolute bottom-full left-0 mb-2 w-48 rounded-xl p-1.5 shadow-2xl z-40 animate-in zoom-in-95"
+                    className="absolute bottom-full left-0 z-40 mb-2 w-48 rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95"
                     style={{
                       background: 'var(--color-modal)',
                       border: '1px solid var(--color-border)',
@@ -661,59 +785,130 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 </>
               )}
             </div>
-            {fmtBtn(<Image className="h-4 w-4" />, 'Add image', () => pickFiles('image/*'))}
-            {fmtBtn(<Mic className="h-4 w-4" />, 'Add audio', () => pickFiles('audio/*'))}
             {fmtBtn(<BarChart2 className="h-4 w-4" />, 'Create poll', () => setPollModalOpen(true))}
             {fmtBtn(<Slash className="h-4 w-4" />, 'Slash commands', () => insertPlain('/'))}
           </div>
 
-
-          {showEmoji && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowEmoji(false)} />
-              <div
-                className="absolute bottom-full right-2 z-40 mb-2 w-[13.75rem] shrink-0 rounded-xl p-2 shadow-2xl animate-in zoom-in-95"
+          <div className="relative flex items-center">
+            {scheduleNotice && (
+              <span
+                className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium shadow-lg"
                 style={{
                   background: 'var(--color-modal)',
                   border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
                 }}
               >
-                <div className="grid grid-cols-6 gap-0.5">
-                  {EMOJI_LIST.map((em) => (
+                <Clock className="mr-1 inline h-3 w-3" style={{ color: 'var(--color-accent)' }} />
+                {scheduleNotice}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => handleSend()}
+              disabled={!canSend}
+              className="flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-xs font-semibold text-white transition-all active:scale-95 disabled:active:scale-100"
+              style={{
+                background: canSend
+                  ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
+                  : 'var(--color-elevated)',
+                color: canSend ? '#fff' : 'var(--color-text-tertiary)',
+                boxShadow: canSend ? '0 0 14px rgba(124,58,237,0.35)' : 'none',
+                cursor: canSend ? 'pointer' : 'default',
+              }}
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>{isUploading ? 'Uploading…' : isAiRewriting ? 'AI…' : 'Send'}</span>
+            </button>
+            <button
+              type="button"
+              disabled={!canSend}
+              onClick={() => setShowSendMenu((v) => !v)}
+              aria-label="Schedule message"
+              className="flex h-[26px] items-center justify-center rounded-r-lg border-l px-1.5 transition-all active:scale-95 disabled:active:scale-100"
+              style={{
+                background: canSend
+                  ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
+                  : 'var(--color-elevated)',
+                borderColor: canSend ? 'rgba(255,255,255,0.25)' : 'var(--color-border)',
+                color: canSend ? '#fff' : 'var(--color-text-tertiary)',
+                cursor: canSend ? 'pointer' : 'default',
+              }}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {showSendMenu && canSend && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowSendMenu(false)} />
+                <div
+                  className="absolute bottom-full right-0 z-40 mb-2 w-64 rounded-xl p-2 shadow-2xl animate-in zoom-in-95"
+                  style={{
+                    background: 'var(--color-modal)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  <p
+                    className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                  >
+                    Schedule message
+                  </p>
+                  {schedulePresets().map((preset) => (
                     <button
-                      key={em}
+                      key={preset.id}
                       type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        insertPlain(em);
-                        setShowEmoji(false);
-                      }}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl leading-none transition-all hover:scale-110 hover-surface-strong"
+                      onClick={() => handleSend(preset.at.toISOString())}
+                      className="flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white/10"
                     >
-                      {em}
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        {preset.label}
+                      </span>
+                      <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                        {preset.at.toLocaleString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </span>
                     </button>
                   ))}
+                  <div
+                    className="mt-1.5 space-y-1.5 border-t px-1 pt-2"
+                    style={{ borderColor: 'var(--color-border-subtle)' }}
+                  >
+                    <label
+                      className="block px-1.5 text-[10px] font-semibold"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      Custom date & time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={customSchedule}
+                      onChange={(e) => setCustomSchedule(e.target.value)}
+                      className="w-full rounded-lg border px-2 py-1.5 text-xs outline-none"
+                      style={{
+                        background: 'var(--color-input)',
+                        borderColor: 'var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={scheduleCustom}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white"
+                      style={{ background: 'var(--color-accent)' }}
+                    >
+                      <Clock className="h-3.5 w-3.5" />
+                      Schedule
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={handleSend}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-all active:scale-95"
-            style={{
-              background: canSend
-                ? 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))'
-                : 'var(--color-elevated)',
-              color: canSend ? '#fff' : 'var(--color-text-tertiary)',
-              boxShadow: canSend ? '0 0 14px rgba(124,58,237,0.35)' : 'none',
-              cursor: canSend ? 'pointer' : 'default',
-            }}
-          >
-            <Send className="h-3.5 w-3.5" />
-            <span>{isUploading ? 'Uploading…' : isAiRewriting ? 'AI…' : 'Send'}</span>
-          </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

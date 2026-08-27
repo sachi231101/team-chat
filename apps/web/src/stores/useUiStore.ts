@@ -4,7 +4,7 @@ import { Message } from '@team-chat/shared';
 export type RailTab = 'home' | 'dms' | 'activity' | 'files' | 'later';
 export type ActiveType = 'channel' | 'conversation';
 export type DetailsTab = 'about' | 'members' | 'files' | 'pinned' | 'links' | 'actions' | 'decisions';
-export type ChatHeaderTab = 'messages' | 'files' | 'pinned' | 'links' | 'actions' | 'decisions';
+export type ChatHeaderTab = 'messages' | 'actions' | 'decisions' | 'files' | 'pinned' | 'links';
 
 export type NavEntry = { type: ActiveType; id: string };
 
@@ -31,8 +31,36 @@ export interface CustomSidebarSection {
 const STARRED_CHANNELS_KEY = 'team_chat_starred_channels';
 const THEME_KEY = 'team_chat_theme';
 const CUSTOM_SECTIONS_KEY = 'team_chat_custom_sections';
+const PREFS_KEY = 'team_chat_prefs';
 
 export type AppTheme = 'dark' | 'slate' | 'light';
+
+type StoredPrefs = {
+  density?: 'comfortable' | 'compact';
+  soundEnabled?: boolean;
+  sendWithEnter?: boolean;
+};
+
+function loadPrefs(): StoredPrefs {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as StoredPrefs;
+  } catch {
+    return {};
+  }
+}
+
+function savePrefs(patch: StoredPrefs) {
+  if (typeof window === 'undefined') return;
+  try {
+    const next = { ...loadPrefs(), ...patch };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
 
 function loadTheme(): AppTheme {
   if (typeof window === 'undefined') return 'dark';
@@ -160,6 +188,8 @@ interface UiState {
   setPeopleModalOpen: (open: boolean) => void;
   inviteModalOpen: boolean;
   setInviteModalOpen: (open: boolean) => void;
+  addMembersModalOpen: boolean;
+  setAddMembersModalOpen: (open: boolean) => void;
   // AI Advantages Modals & Workflows
   dailyBriefingOpen: boolean;
   setDailyBriefingOpen: (open: boolean) => void;
@@ -214,6 +244,8 @@ interface UiState {
   setDensity: (density: 'comfortable' | 'compact') => void;
   soundEnabled: boolean;
   setSoundEnabled: (enabled: boolean) => void;
+  sendWithEnter: boolean;
+  setSendWithEnter: (enabled: boolean) => void;
 }
 
 function pushNavEntry(stack: NavEntry[], index: number, entry: NavEntry) {
@@ -247,7 +279,13 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
   activeRailTab: 'home',
-  setActiveRailTab: (activeRailTab) => set({ activeRailTab }),
+  setActiveRailTab: (activeRailTab) =>
+    set({
+      activeRailTab,
+      ...(activeRailTab === 'files' || activeRailTab === 'later' || activeRailTab === 'activity'
+        ? { profileModalOpen: false, settingsModalOpen: false }
+        : {}),
+    }),
 
   activeId: '',
   activeType: 'channel',
@@ -260,7 +298,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   applyNavigation: (entry, options = {}) => {
     const { recordHistory = true } = options;
     set((state) => {
-      const base = entryState(entry);
+      const base = { ...entryState(entry), profileModalOpen: false, settingsModalOpen: false };
       if (!recordHistory) {
         const existingIndex = state.navStack.findIndex(
           (item) => item.type === entry.type && item.id === entry.id,
@@ -391,11 +429,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   editingMessageId: null,
   setEditingMessageId: (editingMessageId) => set({ editingMessageId }),
   jumpToMessage: ({ messageId, channelId, conversationId }) => {
-
     if (channelId) get().setActiveChannel(channelId);
     else if (conversationId) get().setActiveConversation(conversationId);
-    get().openThread(messageId);
-    set({ focusMessageId: messageId, searchModalOpen: false, activeRailTab: channelId ? 'home' : 'dms' });
+    set({
+      focusMessageId: messageId,
+      searchModalOpen: false,
+      chatHeaderTab: 'messages',
+      profileModalOpen: false,
+      settingsModalOpen: false,
+      activeRailTab: channelId ? 'home' : conversationId ? 'dms' : get().activeRailTab,
+    });
   },
 
   detailsPanelOpen: false,
@@ -440,13 +483,23 @@ export const useUiStore = create<UiState>((set, get) => ({
   createChannelModalOpen: false,
   setCreateChannelModalOpen: (createChannelModalOpen) => set({ createChannelModalOpen }),
   profileModalOpen: false,
-  setProfileModalOpen: (profileModalOpen) => set({ profileModalOpen }),
+  setProfileModalOpen: (profileModalOpen) =>
+    set({
+      profileModalOpen,
+      ...(profileModalOpen ? { settingsModalOpen: false } : {}),
+    }),
   settingsModalOpen: false,
-  setSettingsModalOpen: (settingsModalOpen) => set({ settingsModalOpen }),
+  setSettingsModalOpen: (settingsModalOpen) =>
+    set({
+      settingsModalOpen,
+      ...(settingsModalOpen ? { profileModalOpen: false } : {}),
+    }),
   peopleModalOpen: false,
   setPeopleModalOpen: (peopleModalOpen) => set({ peopleModalOpen }),
   inviteModalOpen: false,
   setInviteModalOpen: (inviteModalOpen) => set({ inviteModalOpen }),
+  addMembersModalOpen: false,
+  setAddMembersModalOpen: (addMembersModalOpen) => set({ addMembersModalOpen }),
 
   // AI Advantages Modals & Workflows
   dailyBriefingOpen: false,
@@ -510,8 +563,19 @@ export const useUiStore = create<UiState>((set, get) => ({
     saveTheme(next);
     set({ theme: next });
   },
-  density: 'comfortable',
-  setDensity: (density) => set({ density }),
-  soundEnabled: true,
-  setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+  density: loadPrefs().density === 'compact' ? 'compact' : 'comfortable',
+  setDensity: (density) => {
+    savePrefs({ density });
+    set({ density });
+  },
+  soundEnabled: loadPrefs().soundEnabled !== false,
+  setSoundEnabled: (soundEnabled) => {
+    savePrefs({ soundEnabled });
+    set({ soundEnabled });
+  },
+  sendWithEnter: loadPrefs().sendWithEnter !== false,
+  setSendWithEnter: (sendWithEnter) => {
+    savePrefs({ sendWithEnter });
+    set({ sendWithEnter });
+  },
 }));

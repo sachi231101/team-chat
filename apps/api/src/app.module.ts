@@ -22,7 +22,8 @@ import { AiModule } from './ai/ai.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 200,
+        // Chat UIs fire many requests; keep production tighter, local looser.
+        limit: process.env.NODE_ENV === 'production' ? 200 : 2000,
       },
     ]),
     CommonModule,

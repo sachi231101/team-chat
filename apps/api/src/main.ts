@@ -27,7 +27,7 @@ async function bootstrap() {
   if (!existsSync(UPLOAD_DIR)) {
     mkdirSync(UPLOAD_DIR, { recursive: true });
   }
-  app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
+  // Uploads are served via authenticated AttachmentsController / UploadsController — not public static.
 
   app.use(
     helmet({

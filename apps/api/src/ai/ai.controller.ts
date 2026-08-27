@@ -131,9 +131,9 @@ export class AiController {
   }
 
   @Post('recap/send')
-  async sendRecaps() {
+  async sendRecaps(@CurrentUser() user: RequestUser) {
     this.assertReady();
-    const sent = await this.orchestrator.sendDailyRecaps();
+    const sent = await this.orchestrator.sendDailyRecapForUser(user);
     return { sent };
   }
 
@@ -147,9 +147,9 @@ export class AiController {
 
   // 6. Summarize File
   @Post('summarize-file')
-  async summarizeFile(@Body() body: SummarizeFileDto) {
+  async summarizeFile(@CurrentUser() user: RequestUser, @Body() body: SummarizeFileDto) {
     this.assertReady();
-    return this.assistant.summarizeFile(body);
+    return this.assistant.summarizeFile(user, body);
   }
 
   // ── AI ADVANTAGE 1: Conversation-to-work ────────────────────
@@ -243,15 +243,16 @@ export class AiController {
 
   @Patch('decisions/:id')
   async updateDecision(
+    @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Body() body: UpdateDecisionDto,
   ) {
-    return this.decisions.updateDecision(id, body);
+    return this.decisions.updateDecision(user, id, body);
   }
 
   @Delete('decisions/:id')
-  async deleteDecision(@Param('id') id: string) {
-    return this.decisions.deleteDecision(id);
+  async deleteDecision(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.decisions.deleteDecision(user, id);
   }
 
   @Post('decisions/detect')
@@ -287,15 +288,16 @@ export class AiController {
 
   @Patch('rules/:id/toggle')
   async toggleRule(
+    @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Body('active') active: boolean,
   ) {
-    return this.learning.toggleRule(id, active);
+    return this.learning.toggleRule(user, id, active);
   }
 
   @Delete('rules/:id')
-  async deleteRule(@Param('id') id: string) {
-    return this.learning.deleteRule(id);
+  async deleteRule(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.learning.deleteRule(user, id);
   }
 
   private assertReady() {

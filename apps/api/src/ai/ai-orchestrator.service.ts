@@ -70,21 +70,31 @@ export class AiOrchestratorService implements OnModuleInit {
     });
     let sent = 0;
     for (const user of humans) {
-      const { recap } = await this.assistant.recap({
+      await this.sendDailyRecapForUser({
         id: user.id,
         workplaceId: user.workplaceId,
-      });
-      const convo = await this.conversations.create({
-        participants: [user.id, 'usr-agent-workspace'],
-        workplaceId: user.workplaceId,
-      });
-      await this.messages.create('usr-agent-workspace', {
-        content: `**Daily recap**\n\n${recap}`,
-        conversationId: convo.id,
       });
       sent += 1;
     }
     return sent;
+  }
+
+  /** Send a daily recap DM only for the requesting user (scoped HTTP entry). */
+  async sendDailyRecapForUser(user: { id: string; workplaceId: string }): Promise<number> {
+    if (!this.llm.isEnabled()) return 0;
+    const { recap } = await this.assistant.recap({
+      id: user.id,
+      workplaceId: user.workplaceId,
+    });
+    const convo = await this.conversations.create({
+      participants: [user.id, 'usr-agent-workspace'],
+      workplaceId: user.workplaceId,
+    });
+    await this.messages.create('usr-agent-workspace', {
+      content: `**Daily recap**\n\n${recap}`,
+      conversationId: convo.id,
+    });
+    return 1;
   }
 
   private async handle(message: Message): Promise<void> {
@@ -133,7 +143,7 @@ export class AiOrchestratorService implements OnModuleInit {
       this.logger.error(`AI response error for agent ${agentId}: ${(err as Error).message}`, (err as Error).stack);
       try {
         await this.messages.create(agentId, {
-          content: `I'm having a brief issue generating a response: ${(err as Error).message}. Please try again!`,
+          content: `I'm having a brief issue generating a response. Please try again!`,
           channelId: message.channelId,
           conversationId: message.conversationId,
           parentMessageId: message.parentMessageId ?? (message.channelId ? message.id : undefined),

@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Calendar, User as UserIcon, Tag, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckSquare, Calendar, User as UserIcon, Tag, AlertCircle, Loader2 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
 import { useWorkspace, useChatMutations } from '../../../hooks';
 import { ActionItemStatus } from '@team-chat/shared';
+import { Modal, Button, Input } from '../../../components/ui';
+
+/** Strip markdown noise so action titles stay readable. */
+function titleFromMessage(content: string): string {
+  const plain = content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/\|/g, ' ')
+    .replace(/[-*_]{3,}/g, ' ')
+    .replace(/[#>*_~[\]]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return 'Follow up';
+  return plain.length > 80 ? `${plain.slice(0, 77)}…` : plain;
+}
 
 export const CreateActionModal: React.FC = () => {
   const {
@@ -25,22 +40,19 @@ export const CreateActionModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (createActionModalOpen) {
-      if (actionTargetMessage) {
-        setTitle(actionTargetMessage.content.slice(0, 80));
-        setDescription(`From message: "${actionTargetMessage.content}"`);
-      } else {
-        setTitle('');
-        setDescription('');
-      }
-      setStatus('TODO');
-      setDueDate('');
-      setAssigneeId(currentUser.id);
-      setError(null);
+    if (!createActionModalOpen) return;
+    if (actionTargetMessage) {
+      setTitle(titleFromMessage(actionTargetMessage.content));
+      setDescription('');
+    } else {
+      setTitle('');
+      setDescription('');
     }
+    setStatus('TODO');
+    setDueDate('');
+    setAssigneeId(currentUser.id);
+    setError(null);
   }, [createActionModalOpen, actionTargetMessage, currentUser.id]);
-
-  if (!createActionModalOpen) return null;
 
   const handleClose = () => {
     setCreateActionModalOpen(false);
@@ -66,163 +78,192 @@ export const CreateActionModal: React.FC = () => {
         conversationId: activeType === 'conversation' ? activeId : undefined,
       });
       handleClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create action item');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create action item');
     }
   };
 
+  const people = users.filter((u) => !u.id.startsWith('usr-agent-'));
+  const agents = users.filter((u) => u.id.startsWith('usr-agent-'));
+
+  const fieldStyle: React.CSSProperties = {
+    background: 'var(--color-input)',
+    color: 'var(--color-text-primary)',
+    border: '1px solid var(--color-border)',
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-lg rounded-2xl bg-stone-900 border border-stone-800 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-stone-950/40">
-          <div className="flex items-center gap-2.5 text-emerald-400">
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-stone-100">
-                {actionTargetMessage ? 'Turn Message into Action Item' : 'New In-Chat Action Item'}
-              </h3>
-              <p className="text-xs text-stone-400">
-                Linked directly to conversation context & synced with tasks
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors"
+    <Modal
+      isOpen={createActionModalOpen}
+      onClose={handleClose}
+      title={actionTargetMessage ? 'Create action from message' : 'New action item'}
+      description="Track follow-ups tied to this chat. Linked to the conversation context."
+      maxWidth="lg"
+    >
+      <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-4">
+        {error && (
+          <div
+            className="flex items-center gap-2 rounded-lg border p-3 text-xs"
+            style={{
+              background: 'var(--color-danger-muted, rgba(244,63,94,0.1))',
+              borderColor: 'rgba(244,63,94,0.3)',
+              color: 'var(--color-danger, #f43f5e)',
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+            Title <span style={{ color: 'var(--color-accent)' }}>*</span>
+          </label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Update API docs for release"
+            required
+            autoFocus
+          />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+            Notes <span className="font-normal" style={{ color: 'var(--color-text-tertiary)' }}>(optional)</span>
+          </label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Acceptance criteria, links, or extra context…"
+            className="w-full resize-none rounded-xl px-3.5 py-2 text-sm focus:outline-none"
+            style={fieldStyle}
+          />
+        </div>
 
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-stone-300 mb-1">
-              Task Title <span className="text-emerald-400">*</span>
+            <label
+              className="mb-1.5 flex items-center gap-1 text-xs font-semibold"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <UserIcon className="h-3.5 w-3.5" /> Assignee
             </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Update API documentation for release"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-stone-950/60 border border-stone-800 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-stone-300 mb-1">
-              Description / Context
-            </label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Additional details, criteria, or context..."
-              className="w-full px-3.5 py-2 rounded-xl bg-stone-950/60 border border-stone-800 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1 flex items-center gap-1">
-                <UserIcon className="w-3.5 h-3.5 text-stone-400" /> Assignee
-              </label>
-              <select
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950/60 border border-stone-800 text-sm text-stone-100 focus:outline-none focus:border-emerald-500 transition-all"
-              >
-                <option value="">Unassigned</option>
-                {users.map((u) => (
+            <select
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+              style={fieldStyle}
+            >
+              <option value="">Unassigned</option>
+              <optgroup label="People">
+                {people.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name} {u.id === currentUser.id ? '(You)' : ''}
+                    {u.name}
+                    {u.id === currentUser.id ? ' (You)' : ''}
                   </option>
                 ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-stone-400" /> Due Date
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950/60 border border-stone-800 text-sm text-stone-100 focus:outline-none focus:border-emerald-500 transition-all"
-              />
-            </div>
+              </optgroup>
+              {agents.length > 0 && (
+                <optgroup label="AI apps">
+                  {agents.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <p className="mt-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              People for teammates · AI apps can pick up agent-runnable tasks
+            </p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-stone-300 mb-1 flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5 text-stone-400" /> Initial Status
+            <label
+              className="mb-1.5 flex items-center gap-1 text-xs font-semibold"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <Calendar className="h-3.5 w-3.5" /> Due date
             </label>
-            <div className="flex gap-2">
-              {(['TODO', 'IN_PROGRESS', 'DONE'] as ActionItemStatus[]).map((st) => (
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+              style={fieldStyle}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label
+            className="mb-1.5 flex items-center gap-1 text-xs font-semibold"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            <Tag className="h-3.5 w-3.5" /> Status
+          </label>
+          <div className="flex gap-2">
+            {(['TODO', 'IN_PROGRESS', 'DONE'] as ActionItemStatus[]).map((st) => {
+              const active = status === st;
+              return (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatus(st)}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border transition-all ${
-                    status === st
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                      : 'bg-stone-950/40 border-stone-800 text-stone-400 hover:text-stone-200'
-                  }`}
+                  className="flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-all"
+                  style={{
+                    background: active ? 'var(--color-accent-muted)' : 'var(--color-elevated)',
+                    borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
+                    color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  }}
                 >
-                  {st === 'TODO' ? '📋 To Do' : st === 'IN_PROGRESS' ? '⚡ In Progress' : '✅ Done'}
+                  {st === 'TODO' ? 'To do' : st === 'IN_PROGRESS' ? 'In progress' : 'Done'}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
+        </div>
 
-          {actionTargetMessage && (
-            <div className="p-3 rounded-xl bg-stone-950/80 border border-stone-800/80 text-xs text-stone-400 space-y-1">
-              <span className="font-semibold text-stone-300">Originating Message:</span>
-              <p className="line-clamp-2 italic">"{actionTargetMessage.content}"</p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-800/80">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createActionItem.isPending}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
-            >
-              {createActionItem.isPending ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <CheckSquare className="w-3.5 h-3.5" />
-                  Create Action Item
-                </>
-              )}
-            </button>
+        {actionTargetMessage && (
+          <div
+            className="space-y-1 rounded-xl border p-3 text-xs"
+            style={{
+              background: 'var(--color-elevated)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              Linked message
+            </span>
+            <p className="line-clamp-2 italic">“{titleFromMessage(actionTargetMessage.content)}”</p>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <div
+          className="flex items-center justify-end gap-2.5 border-t pt-4"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <Button type="button" variant="secondary" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={createActionItem.isPending} className="gap-1.5">
+            {createActionItem.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <CheckSquare className="h-3.5 w-3.5" />
+                Create
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };

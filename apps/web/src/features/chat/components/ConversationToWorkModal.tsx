@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X,
   Sparkles,
@@ -11,50 +11,96 @@ import {
   User,
   Calendar,
   Loader2,
-  Plus,
-  ArrowRight,
   RefreshCw,
-  Clock,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
 import { useWorkspace } from '../../../hooks';
 import { chatService } from '../../../services';
-import { Avatar, Tooltip } from '../../../components/ui';
-import { WorkExtractionResult, ExtractedTask, ExtractedDecision, ExtractedRisk, ExtractedApproval } from '@team-chat/shared';
+import { Button } from '../../../components/ui';
+import { queryKeys } from '../../../lib/queryKeys';
+import {
+  WorkExtractionResult,
+  ExtractedTask,
+  ExtractedDecision,
+  ExtractedRisk,
+  ExtractedApproval,
+} from '@team-chat/shared';
+
+type TabId = 'tasks' | 'decisions' | 'risks' | 'approvals';
+
+function friendlyAiError(raw?: string): string {
+  if (!raw) return 'AI could not analyze this chat right now.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('404') || lower.includes('not found') || lower.includes('model')) {
+    return 'AI model is unavailable. Check AI_MODEL / AI_API_KEY in the API env, then try again.';
+  }
+  if (lower.includes('401') || lower.includes('403') || lower.includes('auth') || lower.includes('api key')) {
+    return 'AI authentication failed. Check AI_API_KEY in the API env.';
+  }
+  if (lower.includes('timeout') || lower.includes('network') || lower.includes('fetch')) {
+    return 'Network error talking to the AI service. Try again in a moment.';
+  }
+  return raw.length > 160 ? `${raw.slice(0, 157)}…` : raw;
+}
 
 export const ConversationToWorkModal: React.FC = () => {
   const {
     extractWorkModalOpen,
     setExtractWorkModalOpen,
     extractWorkTarget,
+    setExtractWorkTarget,
     activeId,
     activeType,
+    setChatHeaderTab,
   } = useUiStore();
 
-  const { users, currentUser } = useWorkspace();
+  const { users } = useWorkspace();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'tasks' | 'decisions' | 'risks' | 'approvals'>('tasks');
+  const [activeTab, setActiveTab] = useState<TabId>('tasks');
   const [extractedData, setExtractedData] = useState<WorkExtractionResult | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [appliedSuccess, setAppliedSuccess] = useState(false);
 
-  // Editable local state
   const [tasks, setTasks] = useState<ExtractedTask[]>([]);
   const [decisions, setDecisions] = useState<ExtractedDecision[]>([]);
   const [risks, setRisks] = useState<ExtractedRisk[]>([]);
   const [approvals, setApprovals] = useState<ExtractedApproval[]>([]);
 
+  const people = users.filter((u) => !u.id.startsWith('usr-agent-'));
+  const agents = users.filter((u) => u.id.startsWith('usr-agent-'));
+
+  const scopeLabel = extractWorkTarget?.messageId
+    ? 'This message'
+    : activeType === 'conversation'
+      ? 'This direct message'
+      : 'This channel';
+
+  const resetLocal = useCallback(() => {
+    setExtractedData(null);
+    setTasks([]);
+    setDecisions([]);
+    setRisks([]);
+    setApprovals([]);
+    setAppliedSuccess(false);
+    setApplyError(null);
+    setActiveTab('tasks');
+  }, []);
+
   const extractMutation = useMutation({
-    mutationFn: () => {
-      return chatService.extractWorkWithAi({
-        channelId: extractWorkTarget?.channelId || (activeType === 'channel' ? activeId : undefined),
-        conversationId: extractWorkTarget?.conversationId || (activeType === 'conversation' ? activeId : undefined),
+    mutationFn: () =>
+      chatService.extractWorkWithAi({
+        channelId:
+          extractWorkTarget?.channelId ||
+          (activeType === 'channel' ? activeId : undefined),
+        conversationId:
+          extractWorkTarget?.conversationId ||
+          (activeType === 'conversation' ? activeId : undefined),
         parentMessageId: extractWorkTarget?.parentMessageId,
         messageId: extractWorkTarget?.messageId,
         transcript: extractWorkTarget?.transcript,
-      });
-    },
+      }),
     onSuccess: (data) => {
       setExtractedData(data);
       setTasks(data.tasks || []);
@@ -62,27 +108,61 @@ export const ConversationToWorkModal: React.FC = () => {
       setRisks(data.risks || []);
       setApprovals(data.approvals || []);
       setAppliedSuccess(false);
+      setApplyError(null);
+      if ((data.tasks?.length ?? 0) === 0 && (data.decisions?.length ?? 0) > 0) {
+        setActiveTab('decisions');
+      } else {
+        setActiveTab('tasks');
+      }
     },
   });
 
   useEffect(() => {
     if (extractWorkModalOpen) {
+      resetLocal();
       extractMutation.mutate();
     } else {
-      setExtractedData(null);
-      setAppliedSuccess(false);
+      resetLocal();
+      setExtractWorkTarget(null);
     }
+    // intentionally only when open toggles
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extractWorkModalOpen]);
 
   if (!extractWorkModalOpen) return null;
 
+  const extractError =
+    extractMutation.isError
+      ? friendlyAiError(
+          extractMutation.error instanceof Error
+            ? extractMutation.error.message
+            : String(extractMutation.error),
+        )
+      : extractedData?.error
+        ? friendlyAiError(extractedData.error)
+        : null;
+
+  const hasCommitable = tasks.length > 0 || decisions.length > 0;
+
+  const handleClose = () => {
+    setExtractWorkModalOpen(false);
+  };
+
   const handleApproveAll = async () => {
-    if (isApplying) return;
+    if (isApplying || !hasCommitable) return;
     setIsApplying(true);
+    setApplyError(null);
     try {
+      const channelId =
+        extractWorkTarget?.channelId ||
+        (activeType === 'channel' ? activeId : undefined);
+      const conversationId =
+        extractWorkTarget?.conversationId ||
+        (activeType === 'conversation' ? activeId : undefined);
+
       await chatService.applyWorkWithAi({
-        channelId: activeType === 'channel' ? activeId : undefined,
-        conversationId: activeType === 'conversation' ? activeId : undefined,
+        channelId,
+        conversationId,
         messageId: extractWorkTarget?.messageId,
         tasks: tasks.map((t) => ({
           title: t.title,
@@ -99,21 +179,32 @@ export const ConversationToWorkModal: React.FC = () => {
       });
 
       setAppliedSuccess(true);
-      void queryClient.invalidateQueries({ queryKey: ['actionItems'] });
+      void queryClient.invalidateQueries({ queryKey: ['actions'] });
+      void queryClient.invalidateQueries({ queryKey: ['aiDecisions'] });
       void queryClient.invalidateQueries({ queryKey: ['decisions'] });
-      void queryClient.invalidateQueries({ queryKey: ['messages'] });
+      if (activeId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.actions(activeType, activeId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.decisions(activeType, activeId),
+        });
+      }
 
-      setTimeout(() => {
-        setExtractWorkModalOpen(false);
-      }, 1200);
+      if (tasks.length > 0) setChatHeaderTab('actions');
+      else if (decisions.length > 0) setChatHeaderTab('decisions');
+
+      setTimeout(() => handleClose(), 1000);
     } catch (err) {
-      console.error('Failed to apply extracted work:', err);
+      setApplyError(
+        err instanceof Error ? err.message : 'Failed to save work items.',
+      );
     } finally {
       setIsApplying(false);
     }
   };
 
-  const handleUpdateTask = (idx: number, field: keyof ExtractedTask, value: any) => {
+  const handleUpdateTask = (idx: number, field: keyof ExtractedTask, value: string | undefined) => {
     setTasks((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
@@ -121,125 +212,153 @@ export const ConversationToWorkModal: React.FC = () => {
     });
   };
 
-  const handleRemoveTask = (idx: number) => {
-    setTasks((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleUpdateDecision = (idx: number, field: keyof ExtractedDecision, value: any) => {
+  const handleUpdateDecision = (
+    idx: number,
+    field: keyof ExtractedDecision,
+    value: string | string[] | undefined,
+  ) => {
     setDecisions((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value };
+      next[idx] = { ...next[idx], [field]: value } as ExtractedDecision;
       return next;
     });
   };
 
-  const handleRemoveDecision = (idx: number) => {
-    setDecisions((prev) => prev.filter((_, i) => i !== idx));
+  const tabs: Array<{ id: TabId; label: string; count: number; icon: typeof CheckSquare }> = [
+    { id: 'tasks', label: 'Tasks', count: tasks.length, icon: CheckSquare },
+    { id: 'decisions', label: 'Decisions', count: decisions.length, icon: Award },
+    { id: 'risks', label: 'Risks', count: risks.length, icon: AlertTriangle },
+    { id: 'approvals', label: 'Approvals', count: approvals.length, icon: FileCheck },
+  ];
+
+  const emptyPanel = (icon: React.ReactNode, title: string, body: string) => (
+    <div
+      className="rounded-xl border border-dashed px-4 py-12 text-center"
+      style={{ borderColor: 'var(--color-border)' }}
+    >
+      <div className="mx-auto mb-2 flex justify-center opacity-60">{icon}</div>
+      <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+        {title}
+      </p>
+      <p className="mx-auto mt-1 max-w-sm text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+        {body}
+      </p>
+    </div>
+  );
+
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--color-elevated)',
+    border: '1px solid var(--color-border)',
+  };
+
+  const fieldStyle: React.CSSProperties = {
+    background: 'var(--color-input)',
+    color: 'var(--color-text-primary)',
+    border: '1px solid var(--color-border)',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
       <div
-        className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl border overflow-hidden animate-in zoom-in-95 duration-150"
+        role="dialog"
+        aria-modal="true"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95 duration-150"
         style={{
-          background: 'var(--color-elevated)',
-          borderColor: 'var(--color-border)',
+          background: 'var(--color-modal)',
+          border: '1px solid var(--color-border)',
         }}
       >
-        {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="flex items-center justify-between gap-3 border-b px-5 py-4"
           style={{ borderColor: 'var(--color-border)' }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl shadow-md"
-              style={{
-                background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)',
-              }}
-            >
-              <Sparkles className="h-5 w-5 text-white" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Sparkles className="h-4 w-4 shrink-0" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                Extract work
+              </h2>
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{
+                  background: 'var(--color-accent-muted)',
+                  color: 'var(--color-accent)',
+                }}
+              >
+                {scopeLabel}
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">Conversation-to-Work</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                  AI Extractor
-                </span>
-              </div>
-              <p className="text-xs text-stone-400">
-                Detects action items, owners, deadlines, decisions, risks, and approvals automatically
-              </p>
-            </div>
+            <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              AI suggests tasks and decisions — review, then save into this chat.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
               type="button"
-              onClick={() => extractMutation.mutate()}
+              variant="secondary"
+              size="xs"
+              className="gap-1"
               disabled={extractMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
+              onClick={() => extractMutation.mutate()}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${extractMutation.isPending ? 'animate-spin' : ''}`} />
-              <span>Re-analyze</span>
-            </button>
+              <RefreshCw className={`h-3.5 w-3.5 ${extractMutation.isPending ? 'animate-spin' : ''}`} />
+              Retry
+            </Button>
             <button
               type="button"
-              onClick={() => setExtractWorkModalOpen(false)}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
+              onClick={handleClose}
+              className="rounded-lg p-1.5 transition-colors hover-surface"
+              style={{ color: 'var(--color-text-secondary)' }}
+              aria-label="Close"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* AI Summary Banner */}
-        {extractedData?.summary && (
+        {extractedData?.summary && !extractError && (
           <div
-            className="px-6 py-3 border-b text-xs flex items-center gap-2.5"
+            className="flex items-start gap-2 border-b px-5 py-2.5 text-xs"
             style={{
-              background: 'rgba(139, 92, 246, 0.08)',
-              borderColor: 'rgba(139, 92, 246, 0.2)',
-              color: '#c4b5fd',
+              borderColor: 'var(--color-border)',
+              background: 'var(--color-accent-muted)',
+              color: 'var(--color-text-secondary)',
             }}
           >
-            <Sparkles className="w-4 h-4 shrink-0 text-violet-400" />
-            <span className="leading-relaxed">
-              <strong>Summary:</strong> {extractedData.summary}
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+            <span>
+              <strong style={{ color: 'var(--color-text-primary)' }}>Summary:</strong> {extractedData.summary}
             </span>
           </div>
         )}
 
-        {/* Tab Navigation */}
         <div
-          className="flex items-center gap-2 px-6 pt-3 border-b shrink-0 text-xs font-semibold"
+          className="flex items-center gap-1 overflow-x-auto border-b px-4 pt-2"
           style={{ borderColor: 'var(--color-border)' }}
         >
-          {[
-            { id: 'tasks', label: 'Action Items & Tasks', count: tasks.length, icon: CheckSquare, color: 'text-emerald-400' },
-            { id: 'decisions', label: 'Decisions Agreed', count: decisions.length, icon: Award, color: 'text-amber-400' },
-            { id: 'risks', label: 'Risks & Blockers', count: risks.length, icon: AlertTriangle, color: 'text-rose-400' },
-            { id: 'approvals', label: 'Approvals Required', count: approvals.length, icon: FileCheck, color: 'text-sky-400' },
-          ].map((tab) => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 pb-2.5 border-b-2 transition-all ${
-                  active
-                    ? 'border-violet-500 text-white font-bold'
-                    : 'border-transparent text-stone-400 hover:text-stone-300'
-                }`}
+                onClick={() => setActiveTab(tab.id)}
+                className="flex shrink-0 items-center gap-1.5 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors"
+                style={{
+                  borderBottomColor: active ? 'var(--color-accent)' : 'transparent',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                }}
               >
-                <Icon className={`w-4 h-4 ${tab.color}`} />
-                <span>{tab.label}</span>
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                    active ? 'bg-violet-500/20 text-violet-300' : 'bg-stone-800 text-stone-400'
-                  }`}
+                  className="rounded-full px-1.5 py-0.5 text-[10px]"
+                  style={{
+                    background: active ? 'var(--color-accent-muted)' : 'var(--color-elevated)',
+                    color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                  }}
                 >
                   {tab.count}
                 </span>
@@ -248,156 +367,186 @@ export const ConversationToWorkModal: React.FC = () => {
           })}
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 min-h-[280px] space-y-4">
+        <div className="min-h-[260px] flex-1 space-y-3 overflow-y-auto p-5">
           {extractMutation.isPending ? (
-            <div className="flex flex-col items-center justify-center h-48 gap-3 text-stone-400">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
-              <p className="text-sm font-semibold text-stone-200">Analyzing conversation with AI...</p>
-              <p className="text-xs text-stone-500 max-w-sm text-center">
-                Extracting action items, assignees, deadlines, decisions, risks, and pending approvals
+            <div
+              className="flex h-48 flex-col items-center justify-center gap-2"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--color-accent)' }} />
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                Analyzing conversation…
               </p>
+              <p className="max-w-sm text-center text-xs">
+                Looking for tasks, owners, deadlines, and decisions
+              </p>
+            </div>
+          ) : extractError ? (
+            <div
+              className="flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-4 text-center"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
+              <AlertTriangle className="h-8 w-8" style={{ color: 'var(--color-danger, #f43f5e)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Extraction failed
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  {extractError}
+                </p>
+                <p className="mx-auto mt-2 max-w-md text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  You can still add actions or record decisions manually from the Actions / Decisions tabs.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                size="xs"
+                className="gap-1"
+                onClick={() => extractMutation.mutate()}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Try again
+              </Button>
             </div>
           ) : (
             <>
-              {/* TAB 1: Tasks */}
-              {activeTab === 'tasks' && (
-                <div className="space-y-3">
-                  {tasks.length === 0 ? (
-                    <div className="text-center py-12 text-stone-500 border border-dashed border-stone-800 rounded-xl">
-                      <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-50 text-emerald-400" />
-                      <p className="text-sm font-medium text-stone-300">No pending action items detected</p>
-                      <p className="text-xs mt-1 text-stone-500">
-                        Discuss deliverables, assign owners, or set deadlines in chat to detect them automatically.
-                      </p>
-                    </div>
-                  ) : (
-                    tasks.map((task, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-xl border bg-stone-950/60 border-stone-800/80 hover:border-emerald-500/40 shadow-sm transition-all space-y-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
+              {activeTab === 'tasks' &&
+                (tasks.length === 0
+                  ? emptyPanel(
+                      <CheckSquare className="h-8 w-8" style={{ color: 'var(--color-accent)' }} />,
+                      'No tasks detected',
+                      'Talk about deliverables, owners, or deadlines in chat, then retry.',
+                    )
+                  : tasks.map((task, idx) => (
+                      <div key={idx} className="space-y-2.5 rounded-xl p-3.5" style={cardStyle}>
+                        <div className="flex items-start gap-2">
                           <input
                             type="text"
                             value={task.title}
                             onChange={(e) => handleUpdateTask(idx, 'title', e.target.value)}
-                            className="flex-1 bg-transparent text-sm font-semibold text-stone-100 focus:outline-none focus:border-b border-violet-500"
-                            placeholder="Task title..."
+                            className="min-w-0 flex-1 bg-transparent text-sm font-semibold focus:outline-none"
+                            style={{ color: 'var(--color-text-primary)' }}
+                            placeholder="Task title"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveTask(idx)}
-                            className="text-stone-500 hover:text-rose-400 p-1 transition-colors"
-                            title="Remove task"
+                            onClick={() => setTasks((prev) => prev.filter((_, i) => i !== idx))}
+                            className="rounded p-1 hover-surface"
+                            style={{ color: 'var(--color-text-tertiary)' }}
+                            aria-label="Remove task"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
-
-                        {task.description && (
-                          <textarea
-                            value={task.description}
-                            onChange={(e) => handleUpdateTask(idx, 'description', e.target.value)}
-                            rows={2}
-                            className="w-full text-xs bg-stone-900/80 rounded-lg p-2 text-stone-300 border border-stone-800 focus:outline-none"
-                            placeholder="Description..."
-                          />
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-3 text-xs pt-1 border-t border-stone-800/60">
-                          {/* Assignee selector */}
+                        <textarea
+                          value={task.description || ''}
+                          onChange={(e) => handleUpdateTask(idx, 'description', e.target.value)}
+                          rows={2}
+                          className="w-full resize-none rounded-lg p-2 text-xs focus:outline-none"
+                          style={fieldStyle}
+                          placeholder="Notes (optional)"
+                        />
+                        <div
+                          className="flex flex-wrap items-center gap-2 border-t pt-2 text-xs"
+                          style={{ borderColor: 'var(--color-border-subtle)' }}
+                        >
                           <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-violet-400" />
+                            <User className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
                             <select
                               value={task.assigneeId || ''}
-                              onChange={(e) => handleUpdateTask(idx, 'assigneeId', e.target.value || undefined)}
-                              className="bg-stone-900 text-stone-200 border border-stone-800 rounded-md px-2 py-1 text-xs focus:outline-none"
+                              onChange={(e) =>
+                                handleUpdateTask(idx, 'assigneeId', e.target.value || undefined)
+                              }
+                              className="rounded-md px-2 py-1 text-xs focus:outline-none"
+                              style={fieldStyle}
                             >
                               <option value="">Unassigned</option>
-                              {users.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.name} {u.id.startsWith('usr-agent-') ? '(AI Agent)' : ''}
-                                </option>
-                              ))}
+                              <optgroup label="People">
+                                {people.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              {agents.length > 0 && (
+                                <optgroup label="AI apps">
+                                  {agents.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
                             </select>
                           </div>
-
-                          {/* Due Date */}
                           <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-sky-400" />
+                            <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
                             <input
                               type="date"
                               value={task.dueDate ? task.dueDate.split('T')[0] : ''}
-                              onChange={(e) => handleUpdateTask(idx, 'dueDate', e.target.value || undefined)}
-                              className="bg-stone-900 text-stone-200 border border-stone-800 rounded-md px-2 py-1 text-xs focus:outline-none"
+                              onChange={(e) =>
+                                handleUpdateTask(idx, 'dueDate', e.target.value || undefined)
+                              }
+                              className="rounded-md px-2 py-1 text-xs focus:outline-none"
+                              style={fieldStyle}
                             />
                           </div>
-
-                          {task.confidence && (
-                            <span className="ml-auto text-[10px] text-stone-500">
-                              {(task.confidence * 100).toFixed(0)}% confidence
+                          {typeof task.confidence === 'number' && (
+                            <span className="ml-auto text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                              {Math.round(task.confidence * 100)}% confidence
                             </span>
                           )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    )))}
 
-              {/* TAB 2: Decisions */}
-              {activeTab === 'decisions' && (
-                <div className="space-y-3">
-                  {decisions.length === 0 ? (
-                    <div className="text-center py-12 text-stone-500 border border-dashed border-stone-800 rounded-xl">
-                      <Award className="w-8 h-8 mx-auto mb-2 opacity-50 text-amber-400" />
-                      <p className="text-sm font-medium text-stone-300">No explicit decisions detected</p>
-                      <p className="text-xs mt-1 text-stone-500">
-                        When the team agrees on architectures, designs, or policies, they will be captured here.
-                      </p>
-                    </div>
-                  ) : (
-                    decisions.map((dec, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-xl border bg-stone-950/60 border-stone-800/80 hover:border-amber-500/40 shadow-sm transition-all space-y-2.5"
-                      >
-                        <div className="flex items-start justify-between gap-3">
+              {activeTab === 'decisions' &&
+                (decisions.length === 0
+                  ? emptyPanel(
+                      <Award className="h-8 w-8" style={{ color: 'var(--color-accent)' }} />,
+                      'No decisions detected',
+                      'Agreements and architecture choices in the thread will show up here.',
+                    )
+                  : decisions.map((dec, idx) => (
+                      <div key={idx} className="space-y-2 rounded-xl p-3.5" style={cardStyle}>
+                        <div className="flex items-start gap-2">
                           <input
                             type="text"
                             value={dec.title}
                             onChange={(e) => handleUpdateDecision(idx, 'title', e.target.value)}
-                            className="flex-1 bg-transparent text-sm font-semibold text-amber-300 focus:outline-none focus:border-b border-amber-500"
+                            className="min-w-0 flex-1 bg-transparent text-sm font-semibold focus:outline-none"
+                            style={{ color: 'var(--color-text-primary)' }}
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveDecision(idx)}
-                            className="text-stone-500 hover:text-rose-400 p-1 transition-colors"
+                            onClick={() => setDecisions((prev) => prev.filter((_, i) => i !== idx))}
+                            className="rounded p-1 hover-surface"
+                            style={{ color: 'var(--color-text-tertiary)' }}
+                            aria-label="Remove decision"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
-
-                        <div className="text-xs text-stone-300 bg-stone-900/60 p-2.5 rounded-lg border border-stone-800/80">
-                          <label className="text-[10px] uppercase font-bold text-stone-500 block mb-1">
-                            Rationale
-                          </label>
-                          <textarea
-                            value={dec.rationale || ''}
-                            onChange={(e) => handleUpdateDecision(idx, 'rationale', e.target.value)}
-                            rows={2}
-                            className="w-full bg-transparent text-xs text-stone-200 focus:outline-none resize-none"
-                            placeholder="Why this was agreed..."
-                          />
-                        </div>
-
+                        <textarea
+                          value={dec.rationale || ''}
+                          onChange={(e) => handleUpdateDecision(idx, 'rationale', e.target.value)}
+                          rows={2}
+                          className="w-full resize-none rounded-lg p-2 text-xs focus:outline-none"
+                          style={fieldStyle}
+                          placeholder="Rationale"
+                        />
                         {dec.impactedAreas && dec.impactedAreas.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {dec.impactedAreas.map((area, i) => (
+                          <div className="flex flex-wrap gap-1">
+                            {dec.impactedAreas.map((area) => (
                               <span
-                                key={i}
-                                className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                key={area}
+                                className="rounded border px-2 py-0.5 text-[10px] font-medium"
+                                style={{
+                                  background: 'var(--color-accent-muted)',
+                                  borderColor: 'var(--color-active-border)',
+                                  color: 'var(--color-accent)',
+                                }}
                               >
                                 {area}
                               </span>
@@ -405,134 +554,153 @@ export const ConversationToWorkModal: React.FC = () => {
                           </div>
                         )}
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    )))}
 
-              {/* TAB 3: Risks & Blockers */}
-              {activeTab === 'risks' && (
-                <div className="space-y-3">
-                  {risks.length === 0 ? (
-                    <div className="text-center py-12 text-stone-500 border border-dashed border-stone-800 rounded-xl">
-                      <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50 text-rose-400" />
-                      <p className="text-sm font-medium text-stone-300">No critical risks or blockers identified</p>
-                    </div>
-                  ) : (
-                    risks.map((r, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-xl border bg-stone-950/60 border-stone-800/80 hover:border-rose-500/40 shadow-sm transition-all space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
+              {activeTab === 'risks' &&
+                (risks.length === 0
+                  ? emptyPanel(
+                      <AlertTriangle className="h-8 w-8" style={{ color: 'var(--color-accent)' }} />,
+                      'No risks flagged',
+                      'Risks are informational — they are not saved when you approve.',
+                    )
+                  : risks.map((r, idx) => (
+                      <div key={idx} className="space-y-2 rounded-xl p-3.5" style={cardStyle}>
+                        <div className="flex items-center justify-between gap-2">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                              r.severity === 'HIGH'
-                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                                : r.severity === 'MEDIUM'
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                                : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                            }`}
+                            className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
+                            style={{
+                              background:
+                                r.severity === 'HIGH'
+                                  ? 'rgba(244,63,94,0.12)'
+                                  : r.severity === 'MEDIUM'
+                                    ? 'rgba(245,158,11,0.12)'
+                                    : 'var(--color-accent-muted)',
+                              color:
+                                r.severity === 'HIGH'
+                                  ? '#f43f5e'
+                                  : r.severity === 'MEDIUM'
+                                    ? '#f59e0b'
+                                    : 'var(--color-accent)',
+                            }}
                           >
-                            {r.severity} Severity
+                            {r.severity}
                           </span>
                           {r.owner && (
-                            <span className="text-[11px] text-stone-400">Owner: @{r.owner}</span>
+                            <span className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                              Owner: {r.owner}
+                            </span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-stone-100">{r.title}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                          {r.title}
+                        </p>
                         {r.mitigation && (
-                          <p className="text-xs text-stone-300 bg-stone-900/80 p-2 rounded-lg border border-stone-800">
-                            <strong>Recommended Mitigation:</strong> {r.mitigation}
+                          <p className="rounded-lg p-2 text-xs" style={fieldStyle}>
+                            <strong>Mitigation:</strong> {r.mitigation}
                           </p>
                         )}
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    )))}
 
-              {/* TAB 4: Approvals */}
-              {activeTab === 'approvals' && (
-                <div className="space-y-3">
-                  {approvals.length === 0 ? (
-                    <div className="text-center py-12 text-stone-500 border border-dashed border-stone-800 rounded-xl">
-                      <FileCheck className="w-8 h-8 mx-auto mb-2 opacity-50 text-sky-400" />
-                      <p className="text-sm font-medium text-stone-300">No pending approval requests</p>
-                    </div>
-                  ) : (
-                    approvals.map((app, idx) => (
+              {activeTab === 'approvals' &&
+                (approvals.length === 0
+                  ? emptyPanel(
+                      <FileCheck className="h-8 w-8" style={{ color: 'var(--color-accent)' }} />,
+                      'No approvals detected',
+                      'Approvals are informational — they are not saved when you approve.',
+                    )
+                  : approvals.map((app, idx) => (
                       <div
                         key={idx}
-                        className="p-4 rounded-xl border bg-stone-950/60 border-stone-800/80 hover:border-sky-500/40 shadow-sm transition-all flex items-center justify-between gap-4"
+                        className="flex items-center justify-between gap-3 rounded-xl p-3.5"
+                        style={cardStyle}
                       >
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-stone-100">{app.item}</p>
-                          <div className="flex items-center gap-3 text-xs text-stone-400">
-                            {app.requester && <span>Requested by: @{app.requester}</span>}
-                            {app.approver && <span>Approver: @{app.approver}</span>}
-                          </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                            {app.item}
+                          </p>
+                          <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                            {[app.requester && `From ${app.requester}`, app.approver && `Approver ${app.approver}`]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
                         </div>
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">
+                        <span
+                          className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold"
+                          style={{
+                            background: 'var(--color-accent-muted)',
+                            color: 'var(--color-accent)',
+                          }}
+                        >
                           {app.status}
                         </span>
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    )))}
             </>
           )}
         </div>
 
-        {/* Footer Actions */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-t bg-stone-950/50 shrink-0"
-          style={{ borderColor: 'var(--color-border)' }}
+          className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-header)' }}
         >
-          <div className="text-xs text-stone-400">
-            <span>
-              {tasks.length} action {tasks.length === 1 ? 'item' : 'items'} • {decisions.length}{' '}
-              {decisions.length === 1 ? 'decision' : 'decisions'} to commit
-            </span>
+          <div className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+            {extractError
+              ? 'Fix AI config or use Actions / Decisions manually'
+              : `${tasks.length} task${tasks.length === 1 ? '' : 's'} · ${decisions.length} decision${decisions.length === 1 ? '' : 's'} will be saved${
+                  risks.length + approvals.length > 0
+                    ? ` · ${risks.length + approvals.length} notes stay in this preview only`
+                    : ''
+                }`}
+            {applyError && (
+              <p className="mt-1" style={{ color: 'var(--color-danger, #f43f5e)' }}>
+                {applyError}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setExtractWorkModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
-            >
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={handleClose}>
               Cancel
-            </button>
-
+            </Button>
             {appliedSuccess ? (
-              <div className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-                <Check className="w-4 h-4" />
-                <span>Work Committed to Workspace!</span>
+              <div
+                className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold"
+                style={{
+                  background: 'rgba(34,197,94,0.12)',
+                  borderColor: 'rgba(34,197,94,0.3)',
+                  color: '#16a34a',
+                }}
+              >
+                <Check className="h-4 w-4" />
+                Saved
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
-                onClick={handleApproveAll}
-                disabled={isApplying || extractMutation.isPending || (tasks.length === 0 && decisions.length === 0)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-lg shadow-violet-600/30 transition-all disabled:opacity-40"
-                style={{
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                }}
+                variant="primary"
+                size="sm"
+                className="gap-1.5"
+                disabled={
+                  isApplying ||
+                  extractMutation.isPending ||
+                  Boolean(extractError) ||
+                  !hasCommitable
+                }
+                onClick={() => void handleApproveAll()}
               >
                 {isApplying ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Committing Work Items...</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
                   </>
                 ) : (
                   <>
-                    <Check className="w-4 h-4" />
-                    <span>Approve & Create Work Items</span>
+                    <Check className="h-4 w-4" />
+                    Save {hasCommitable ? `${tasks.length + decisions.length} item${tasks.length + decisions.length === 1 ? '' : 's'}` : 'items'}
                   </>
                 )}
-              </button>
+              </Button>
             )}
           </div>
         </div>

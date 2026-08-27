@@ -1,5 +1,7 @@
 import React from 'react';
 import { AppHeader } from '../../../components/header';
+import { ProfileView } from '../../../components/profile';
+import { SettingsView } from '../../../components/settings';
 import { MessageTimeline } from './MessageTimeline';
 import { MessageComposer } from './MessageComposer';
 import { ChannelFilesPanel } from './ChannelFilesPanel';
@@ -16,6 +18,16 @@ export const MainChatArea: React.FC = () => {
   const activeRailTab = useUiStore((s) => s.activeRailTab);
   const chatHeaderTab = useUiStore((s) => s.chatHeaderTab);
   const activeId = useUiStore((s) => s.activeId);
+  const profileOpen = useUiStore((s) => s.profileModalOpen);
+  const settingsOpen = useUiStore((s) => s.settingsModalOpen);
+
+  if (profileOpen) {
+    return <ProfileView />;
+  }
+
+  if (settingsOpen) {
+    return <SettingsView />;
+  }
 
   if (activeRailTab === 'files') {
     return <FilesView />;
@@ -36,16 +48,16 @@ export const MainChatArea: React.FC = () => {
         <div className="flex flex-1 items-center justify-center px-6 text-center text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
           Select a channel or direct message to get started.
         </div>
+      ) : chatHeaderTab === 'actions' ? (
+        <ChannelActionsPanel />
+      ) : chatHeaderTab === 'decisions' ? (
+        <ChannelDecisionsPanel />
       ) : chatHeaderTab === 'files' ? (
         <ChannelFilesPanel />
       ) : chatHeaderTab === 'pinned' ? (
         <ChannelPinnedPanel />
       ) : chatHeaderTab === 'links' ? (
         <ChannelLinksPanel />
-      ) : chatHeaderTab === 'actions' ? (
-        <ChannelActionsPanel />
-      ) : chatHeaderTab === 'decisions' ? (
-        <ChannelDecisionsPanel />
       ) : (
         <>
           <MessageTimeline />

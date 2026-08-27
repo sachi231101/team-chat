@@ -1,290 +1,499 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BookmarkCheck,
-  Tag,
-  MessageSquare,
-  Loader2,
-  Calendar,
+  ArrowUpRight,
+  Plus,
   Sparkles,
   Award,
   Zap,
   Bell,
-  ArrowUpRight,
-  Plus,
-  Layers,
-  CheckCircle2,
-  Clock,
-  RefreshCw,
+  Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useUiStore } from '../../../stores';
-import { useContextDecisionsQuery, useWorkspace } from '../../../hooks';
+import { useContextDecisionsQuery } from '../../../hooks';
 import { chatService } from '../../../services';
-import { Message, MessageTagType, DecisionRecord } from '@team-chat/shared';
-import { Avatar } from '../../../components/ui';
+import { MessageTagType, DecisionRecord, DecisionStatus } from '@team-chat/shared';
+import { Avatar, Button } from '../../../components/ui';
 
 const TAG_CONFIG: Record<
   MessageTagType,
-  { label: string; icon: any; color: string; bg: string; border: string }
+  { label: string; icon: typeof Award; color: string; bg: string; border: string }
 > = {
   DECISION: {
     label: 'Decision',
     icon: Award,
-    color: 'text-amber-300',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
+    color: 'var(--color-accent)',
+    bg: 'var(--color-accent-muted)',
+    border: 'var(--color-active-border)',
   },
   KEY_TAKEAWAY: {
-    label: 'Key Takeaway',
+    label: 'Key takeaway',
     icon: Sparkles,
-    color: 'text-emerald-300',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
+    color: '#16a34a',
+    bg: 'rgba(34,197,94,0.12)',
+    border: 'rgba(34,197,94,0.3)',
   },
   ANNOUNCEMENT: {
     label: 'Announcement',
     icon: Bell,
-    color: 'text-sky-300',
-    bg: 'bg-sky-500/10',
-    border: 'border-sky-500/20',
+    color: '#0ea5e9',
+    bg: 'rgba(14,165,233,0.12)',
+    border: 'rgba(14,165,233,0.3)',
   },
   FOLLOW_UP: {
-    label: 'Follow Up',
+    label: 'Follow up',
     icon: Zap,
-    color: 'text-purple-300',
-    bg: 'bg-purple-500/10',
-    border: 'border-purple-500/20',
+    color: '#a855f7',
+    bg: 'rgba(168,85,247,0.12)',
+    border: 'rgba(168,85,247,0.3)',
   },
 };
 
+const STATUS_STYLE: Record<DecisionStatus, { label: string; color: string; bg: string; border: string }> = {
+  APPROVED: {
+    label: 'Approved',
+    color: '#16a34a',
+    bg: 'rgba(34,197,94,0.12)',
+    border: 'rgba(34,197,94,0.3)',
+  },
+  UNDER_REVIEW: {
+    label: 'Under review',
+    color: 'var(--color-accent)',
+    bg: 'var(--color-accent-muted)',
+    border: 'var(--color-active-border)',
+  },
+  SUPERSEDED: {
+    label: 'Superseded',
+    color: 'var(--color-text-tertiary)',
+    bg: 'var(--color-elevated)',
+    border: 'var(--color-border)',
+  },
+};
+
+/** Prefer readable chat text; drop raw model “thinking” dumps. */
+function messageSnippet(content: string): string {
+  let text = content.trim();
+  const thinkingIdx = text.search(/here'?s a thinking process/i);
+  if (thinkingIdx > 0) {
+    text = text.slice(0, thinkingIdx).trim();
+  } else if (thinkingIdx === 0) {
+    const finalMatch = text.match(
+      /(?:final(?:\s+(?:answer|response))?|response|summary)\s*:\s*([\s\S]+)/i,
+    );
+    text = (finalMatch?.[1] ?? text).trim();
+  }
+  text = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[*_#>`|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return 'Tagged message';
+  return text.length > 220 ? `${text.slice(0, 217)}…` : text;
+}
+
 export const ChannelDecisionsPanel: React.FC = () => {
-  const { jumpToMessage, activeId, activeType, openRecordDecision, openExtractWorkForTarget } = useUiStore();
-  const [selectedTag, setSelectedTag] = useState<string>('ALL');
+  const {
+    jumpToMessage,
+    activeId,
+    activeType,
+    openRecordDecision,
+    openExtractWorkForTarget,
+  } = useUiStore();
+  const [selectedTag, setSelectedTag] = useState<'ALL' | MessageTagType>('ALL');
+  const queryClient = useQueryClient();
 
   const taggedMessagesQuery = useContextDecisionsQuery();
   const structuredDecisionsQuery = useQuery({
-    queryKey: ['aiDecisions', activeId],
-    queryFn: () => chatService.getAiDecisions({ channelId: activeType === 'channel' ? activeId : undefined }),
+    queryKey: ['aiDecisions', activeType, activeId],
+    queryFn: () =>
+      chatService.getAiDecisions({
+        channelId: activeType === 'channel' ? activeId : undefined,
+      }),
     enabled: Boolean(activeId),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => chatService.deleteAiDecision(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['aiDecisions'] });
+    },
   });
 
   const messages = taggedMessagesQuery.data ?? [];
   const structuredDecisions: DecisionRecord[] = structuredDecisionsQuery.data ?? [];
 
-  const filteredMessages = messages.filter((m) => {
-    if (selectedTag === 'ALL') return true;
-    return m.tags?.some((t) => t.tag === selectedTag);
-  });
+  const filteredMessages = useMemo(() => {
+    if (selectedTag === 'ALL') return messages;
+    return messages.filter((m) => m.tags?.some((t) => t.tag === selectedTag));
+  }, [messages, selectedTag]);
 
-  const totalCount = filteredMessages.length + structuredDecisions.length;
+  const showStructured = selectedTag === 'ALL' || selectedTag === 'DECISION';
+  const visibleStructured = showStructured ? structuredDecisions : [];
+  const totalVisible = filteredMessages.length + visibleStructured.length;
+  const allCount = messages.length + structuredDecisions.length;
+
+  const handleJump = (messageId: string) => {
+    jumpToMessage({
+      messageId,
+      channelId: activeType === 'channel' ? activeId : undefined,
+      conversationId: activeType === 'conversation' ? activeId : undefined,
+    });
+  };
+
+  const openAiExtract = () => {
+    openExtractWorkForTarget({
+      channelId: activeType === 'channel' ? activeId : undefined,
+      conversationId: activeType === 'conversation' ? activeId : undefined,
+    });
+  };
 
   return (
-    <div className="flex flex-col h-full bg-stone-900/50">
-      {/* Header Controls */}
-      <div className="p-4 border-b border-stone-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookmarkCheck className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-semibold text-stone-200">Decision Registry</h3>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-stone-800 text-stone-400">
-              {totalCount}
-            </span>
+    <div className="flex h-full flex-col" style={{ background: 'var(--color-main)' }}>
+      <div
+        className="space-y-3 border-b p-4"
+        style={{ borderColor: 'var(--color-border)', background: 'var(--color-header)' }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <BookmarkCheck className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                Decisions
+              </h3>
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)' }}
+              >
+                {allCount}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              Recorded agreements and tagged highlights from this chat
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
               type="button"
-              onClick={() => openExtractWorkForTarget({ channelId: activeId })}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-colors"
-              title="Detect decisions with AI"
+              variant="secondary"
+              size="xs"
+              className="gap-1"
+              onClick={openAiExtract}
+              title="Extract decisions and tasks with AI"
             >
-              <Sparkles className="w-3 h-3" />
-              <span>AI Detect</span>
-            </button>
-            <button
+              <Sparkles className="h-3 w-3" />
+              AI extract
+            </Button>
+            <Button
               type="button"
-              onClick={() => openRecordDecision({ channelId: activeType === 'channel' ? activeId : undefined })}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
-              title="Record a new decision"
+              variant="primary"
+              size="xs"
+              className="gap-1"
+              onClick={() =>
+                openRecordDecision({
+                  channelId: activeType === 'channel' ? activeId : undefined,
+                })
+              }
             >
-              <Plus className="w-3 h-3" />
-              <span>Record</span>
-            </button>
+              <Plus className="h-3 w-3" />
+              Record
+            </Button>
           </div>
         </div>
 
-        {/* Tag Filters */}
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setSelectedTag('ALL')}
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
-              selectedTag === 'ALL'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold'
-                : 'bg-stone-950/60 border border-stone-800/80 text-stone-400 hover:text-stone-300'
-            }`}
+            className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+            style={{
+              background: selectedTag === 'ALL' ? 'var(--color-accent-muted)' : 'transparent',
+              color: selectedTag === 'ALL' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              border:
+                selectedTag === 'ALL'
+                  ? '1px solid var(--color-active-border)'
+                  : '1px solid transparent',
+            }}
           >
-            All ({totalCount})
+            All ({allCount})
           </button>
-          {(['DECISION', 'KEY_TAKEAWAY', 'ANNOUNCEMENT', 'FOLLOW_UP'] as MessageTagType[]).map((t) => {
+          {(Object.keys(TAG_CONFIG) as MessageTagType[]).map((t) => {
             const cfg = TAG_CONFIG[t];
             const Icon = cfg.icon;
             const active = selectedTag === t;
+            const count = messages.filter((m) => m.tags?.some((tg) => tg.tag === t)).length;
             return (
               <button
                 key={t}
                 type="button"
                 onClick={() => setSelectedTag(t)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
-                  active
-                    ? `${cfg.bg} ${cfg.color} border ${cfg.border} font-semibold`
-                    : 'bg-stone-950/60 border border-stone-800/80 text-stone-400 hover:text-stone-300'
-                }`}
+                className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                style={{
+                  background: active ? cfg.bg : 'transparent',
+                  color: active ? cfg.color : 'var(--color-text-secondary)',
+                  border: active ? `1px solid ${cfg.border}` : '1px solid transparent',
+                }}
               >
-                <Icon className="w-3 h-3" />
+                <Icon className="h-3 w-3" />
                 {cfg.label}
+                {count > 0 ? ` (${count})` : ''}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* List Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {taggedMessagesQuery.isLoading || structuredDecisionsQuery.isLoading ? (
-          <div className="flex flex-col items-center justify-center h-48 text-stone-500 gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-            <span className="text-xs">Loading decisions & takeaways...</span>
+          <div
+            className="flex h-48 flex-col items-center justify-center gap-2"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--color-accent)' }} />
+            <span className="text-xs">Loading decisions...</span>
           </div>
-        ) : totalCount === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-center p-4 border border-dashed border-stone-800 rounded-xl">
-            <BookmarkCheck className="w-8 h-8 text-stone-600 mb-2" />
-            <p className="text-xs font-medium text-stone-300">No decisions or highlights recorded</p>
-            <p className="text-[11px] text-stone-500 mt-1 max-w-[220px]">
-              Tag conclusions or click &ldquo;Record&rdquo; above to preserve agreements in the Decision Registry.
+        ) : totalVisible === 0 ? (
+          <div
+            className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            <BookmarkCheck className="mb-2 h-8 w-8" style={{ color: 'var(--color-text-tertiary)' }} />
+            <p className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              No decisions yet
             </p>
+            <p className="mt-1 max-w-[240px] text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              Record a decision, tag a message, or use AI extract to pull agreements from the conversation.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              className="mt-3 gap-1"
+              onClick={() =>
+                openRecordDecision({
+                  channelId: activeType === 'channel' ? activeId : undefined,
+                })
+              }
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Record decision
+            </Button>
           </div>
         ) : (
           <>
-            {/* Structured Decisions from Registry */}
-            {structuredDecisions.map((dec) => (
-              <div
-                key={dec.id}
-                className="p-3.5 rounded-xl bg-gradient-to-br from-amber-950/20 to-stone-950/80 border border-amber-500/30 shadow-sm transition-all space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-xs font-bold text-amber-300">{dec.title}</span>
-                  </div>
-                  <span
-                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase border ${
-                      dec.status === 'APPROVED'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                        : dec.status === 'UNDER_REVIEW'
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                        : 'bg-stone-800 text-stone-400 border-stone-700'
-                    }`}
-                  >
-                    {dec.status.replace('_', ' ')}
-                  </span>
-                </div>
+            {visibleStructured.length > 0 && (
+              <div className="space-y-2">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                >
+                  Recorded decisions
+                </p>
+                {visibleStructured.map((dec) => {
+                  const st = STATUS_STYLE[dec.status] ?? STATUS_STYLE.APPROVED;
+                  return (
+                    <div
+                      key={dec.id}
+                      className="group space-y-2 rounded-xl border p-3.5"
+                      style={{
+                        background: 'var(--color-elevated)',
+                        borderColor: 'var(--color-border)',
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-start gap-1.5">
+                          <Award
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                            style={{ color: 'var(--color-accent)' }}
+                          />
+                          <span
+                            className="text-xs font-semibold leading-snug"
+                            style={{ color: 'var(--color-text-primary)' }}
+                          >
+                            {dec.title}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                            style={{
+                              background: st.bg,
+                              color: st.color,
+                              border: `1px solid ${st.border}`,
+                            }}
+                          >
+                            {st.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Delete this decision record?')) {
+                                deleteMutation.mutate(dec.id);
+                              }
+                            }}
+                            className="rounded-md p-1 opacity-0 transition-opacity hover-surface group-hover:opacity-100"
+                            style={{ color: 'var(--color-danger, #f43f5e)' }}
+                            aria-label="Delete decision"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
 
-                {dec.rationale && (
-                  <p className="text-[11px] text-stone-300 leading-relaxed pl-2 border-l-2 border-amber-500/40">
-                    {dec.rationale}
+                      {dec.rationale && (
+                        <p
+                          className="line-clamp-3 border-l-2 pl-2 text-[11px] leading-relaxed"
+                          style={{
+                            borderColor: 'var(--color-accent)',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {dec.rationale}
+                        </p>
+                      )}
+
+                      <div
+                        className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-[10px]"
+                        style={{
+                          borderColor: 'var(--color-border-subtle)',
+                          color: 'var(--color-text-tertiary)',
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {dec.decidedByName && <span>By {dec.decidedByName}</span>}
+                          <span>
+                            {new Date(dec.createdAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {dec.impactedAreas?.map((a) => (
+                            <span
+                              key={a}
+                              className="rounded border px-1 py-0.5"
+                              style={{
+                                background: 'var(--color-input)',
+                                borderColor: 'var(--color-border)',
+                                color: 'var(--color-text-secondary)',
+                              }}
+                            >
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {dec.messageId && (
+                        <button
+                          type="button"
+                          onClick={() => handleJump(dec.messageId!)}
+                          className="flex items-center gap-1 text-[11px] font-medium"
+                          style={{ color: 'var(--color-accent)' }}
+                        >
+                          View context
+                          <ArrowUpRight className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {filteredMessages.length > 0 && (
+              <div className="space-y-2">
+                {visibleStructured.length > 0 && (
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                  >
+                    Tagged in chat
                   </p>
                 )}
-
-                <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 border-t border-stone-800/60">
-                  <div className="flex items-center gap-2">
-                    {dec.decidedByName && <span>By: {dec.decidedByName}</span>}
-                    <span>• {new Date(dec.createdAt).toLocaleDateString()}</span>
-                  </div>
-
-                  {dec.impactedAreas && dec.impactedAreas.length > 0 && (
-                    <div className="flex gap-1">
-                      {dec.impactedAreas.map((a, i) => (
-                        <span key={i} className="px-1 rounded bg-stone-900 text-stone-400 border border-stone-800">
-                          {a}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Tagged Messages */}
-            {filteredMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className="group p-3.5 rounded-xl bg-stone-950/60 border border-stone-800/80 hover:border-amber-500/30 shadow-sm transition-all space-y-2"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar
-                      src={msg.senderAvatar}
-                      name={msg.senderName}
-                      size="xs"
-                      className="w-4 h-4 text-[9px]"
-                    />
-                    <span className="text-xs font-medium text-stone-300">{msg.senderName}</span>
-                    <span className="text-[10px] text-stone-500">
-                      {new Date(msg.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      jumpToMessage({
-                        messageId: msg.id,
-                        channelId: activeType === 'channel' ? activeId : undefined,
-                        conversationId: activeType === 'conversation' ? activeId : undefined,
-                      })
-                    }
-                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[11px] text-amber-400 hover:underline transition-opacity"
+                {filteredMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className="group space-y-2 rounded-xl border p-3.5 transition-colors"
+                    style={{
+                      background: 'var(--color-elevated)',
+                      borderColor: 'var(--color-border)',
+                    }}
                   >
-                    <span>Jump</span>
-                    <ArrowUpRight className="w-3 h-3" />
-                  </button>
-                </div>
-
-                {/* Message Content */}
-                <p className="text-xs text-stone-200 leading-relaxed pl-1 border-l-2 border-amber-500/40">
-                  {msg.content}
-                </p>
-
-                {/* Tag Pills */}
-                {msg.tags && msg.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {msg.tags.map((tg) => {
-                      const cfg = TAG_CONFIG[tg.tag] || TAG_CONFIG.DECISION;
-                      const Icon = cfg.icon;
-                      return (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Avatar
+                          src={msg.senderAvatar}
+                          name={msg.senderName}
+                          size="xs"
+                          className="h-4 w-4 text-[9px]"
+                        />
                         <span
-                          key={tg.id}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${cfg.bg} ${cfg.color} ${cfg.border}`}
+                          className="truncate text-xs font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
                         >
-                          <Icon className="w-3 h-3" />
-                          {cfg.label}
-                          {tg.userName && (
-                            <span className="opacity-70 text-[9px]">by {tg.userName}</span>
-                          )}
+                          {msg.senderName}
                         </span>
-                      );
-                    })}
+                        <span className="shrink-0 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                          {new Date(msg.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleJump(msg.id)}
+                        className="flex items-center gap-1 text-[11px] font-medium opacity-70 transition-opacity group-hover:opacity-100"
+                        style={{ color: 'var(--color-accent)' }}
+                      >
+                        Jump
+                        <ArrowUpRight className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    <p
+                      className="line-clamp-3 border-l-2 pl-2 text-xs leading-relaxed"
+                      style={{
+                        borderColor: 'var(--color-accent)',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {messageSnippet(msg.content)}
+                    </p>
+
+                    {msg.tags && msg.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.tags.map((tg) => {
+                          const cfg = TAG_CONFIG[tg.tag] || TAG_CONFIG.DECISION;
+                          const Icon = cfg.icon;
+                          return (
+                            <span
+                              key={tg.id}
+                              className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium"
+                              style={{
+                                background: cfg.bg,
+                                color: cfg.color,
+                                borderColor: cfg.border,
+                              }}
+                            >
+                              <Icon className="h-3 w-3" />
+                              {cfg.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
+            )}
           </>
         )}
       </div>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  FolderPlus,
   Sparkles,
   Zap,
   Flame,
@@ -39,6 +38,12 @@ const SECTION_SUGGESTIONS = [
   { name: 'Client Work', icon: 'briefcase' },
   { name: 'Social & Fun', icon: 'heart' },
 ];
+
+const fieldStyle: React.CSSProperties = {
+  background: 'var(--color-input)',
+  color: 'var(--color-text-primary)',
+  border: '1px solid var(--color-border)',
+};
 
 export const CreateSectionModal: React.FC = () => {
   const { createSectionModalOpen, setCreateSectionModalOpen, createCustomSection, addChannelToCustomSection } =
@@ -98,10 +103,12 @@ export const CreateSectionModal: React.FC = () => {
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-        {/* Section Name */}
         <div>
-          <label className="text-xs font-bold text-stone-200 uppercase tracking-wider block mb-1.5">
-            Section Name <span className="text-violet-400">*</span>
+          <label
+            className="mb-1.5 block text-xs font-bold uppercase tracking-wider"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Section Name <span style={{ color: 'var(--color-accent)' }}>*</span>
           </label>
           <input
             ref={inputRef}
@@ -113,23 +120,38 @@ export const CreateSectionModal: React.FC = () => {
             }}
             placeholder="e.g. Projects, Engineering, Marketing, Operations..."
             maxLength={50}
-            className={`w-full rounded-xl bg-stone-900 text-stone-100 px-3.5 py-2.5 text-xs border focus:outline-none transition-all ${
-              error
-                ? 'border-rose-500 focus:border-rose-500'
-                : 'border-stone-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500'
-            }`}
+            className="w-full rounded-xl px-3.5 py-2.5 text-xs transition-all focus:outline-none"
+            style={{
+              ...fieldStyle,
+              border: error
+                ? '1px solid var(--color-danger)'
+                : '1px solid var(--color-border)',
+            }}
           />
-          {error && <p className="mt-1 text-xs text-rose-400 font-medium">{error}</p>}
+          {error && (
+            <p className="mt-1 text-xs font-medium" style={{ color: 'var(--color-danger)' }}>
+              {error}
+            </p>
+          )}
 
-          {/* Quick Suggestion Chips */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-stone-500 uppercase font-bold">Suggestions:</span>
+            <span
+              className="text-[10px] font-bold uppercase"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              Suggestions:
+            </span>
             {SECTION_SUGGESTIONS.map((s) => (
               <button
                 key={s.name}
                 type="button"
                 onClick={() => handleSuggestionClick(s)}
-                className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-stone-200 border border-stone-800 transition-colors"
+                className="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors hover-surface"
+                style={{
+                  background: 'var(--color-elevated)',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border)',
+                }}
               >
                 {s.name}
               </button>
@@ -137,9 +159,13 @@ export const CreateSectionModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Section Icon Selection */}
         <div>
-          <label className="text-xs font-bold text-stone-300 block mb-1.5">Choose Icon</label>
+          <label
+            className="mb-1.5 block text-xs font-bold"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Choose Icon
+          </label>
           <div className="grid grid-cols-5 gap-2">
             {ICONS.map((item) => {
               const isSelected = selectedIcon === item.id;
@@ -149,34 +175,52 @@ export const CreateSectionModal: React.FC = () => {
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedIcon(item.id)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl border text-xs transition-all ${
+                  className="flex flex-col items-center justify-center rounded-xl border p-2 text-xs transition-all"
+                  style={
                     isSelected
-                      ? 'border-violet-500 bg-violet-500/20 text-violet-300 font-bold shadow-sm'
-                      : 'border-stone-800 bg-stone-900/60 text-stone-400 hover:bg-stone-900 hover:text-stone-200'
-                  }`}
+                      ? {
+                          borderColor: 'var(--color-accent)',
+                          background: 'var(--color-accent-muted)',
+                          color: 'var(--color-accent)',
+                          fontWeight: 700,
+                        }
+                      : {
+                          borderColor: 'var(--color-border)',
+                          background: 'var(--color-input)',
+                          color: 'var(--color-text-secondary)',
+                        }
+                  }
                 >
-                  <IconComp className="w-4 h-4 mb-1" />
-                  <span className="text-[10px] truncate max-w-full">{item.label}</span>
+                  <IconComp className="mb-1 h-4 w-4" />
+                  <span className="max-w-full truncate text-[10px]">{item.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Optional: Add existing channels right away */}
         {channels.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-stone-300">
-                Add Existing Channels <span className="text-stone-500 font-normal">(optional)</span>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-bold" style={{ color: 'var(--color-text-secondary)' }}>
+                Add Existing Channels{' '}
+                <span className="font-normal" style={{ color: 'var(--color-text-tertiary)' }}>
+                  (optional)
+                </span>
               </label>
               {selectedChannelIds.length > 0 && (
-                <span className="text-[11px] text-violet-400 font-medium">
+                <span className="text-[11px] font-medium" style={{ color: 'var(--color-accent)' }}>
                   {selectedChannelIds.length} selected
                 </span>
               )}
             </div>
-            <div className="max-h-36 overflow-y-auto rounded-xl border border-stone-800 bg-stone-900/60 p-1.5 space-y-1">
+            <div
+              className="max-h-36 space-y-1 overflow-y-auto rounded-xl border p-1.5"
+              style={{
+                background: 'var(--color-input)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               {channels.map((channel) => {
                 const isSelected = selectedChannelIds.includes(channel.id);
                 return (
@@ -184,17 +228,39 @@ export const CreateSectionModal: React.FC = () => {
                     key={channel.id}
                     type="button"
                     onClick={() => toggleChannelSelection(channel.id)}
-                    className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                    className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors"
+                    style={
                       isSelected
-                        ? 'bg-violet-500/15 text-violet-300 font-semibold'
-                        : 'hover:bg-stone-800 text-stone-300'
-                    }`}
+                        ? {
+                            background: 'var(--color-accent-muted)',
+                            color: 'var(--color-accent)',
+                            fontWeight: 600,
+                          }
+                        : {
+                            color: 'var(--color-text-primary)',
+                          }
+                    }
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'var(--color-sidebar-hover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-2">
-                      <Hash className="w-3.5 h-3.5 text-stone-400" />
+                      <Hash
+                        className="h-3.5 w-3.5"
+                        style={{ color: 'var(--color-text-tertiary)' }}
+                      />
                       <span>{channel.name}</span>
                     </div>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-violet-400" />}
+                    {isSelected && (
+                      <Check className="h-3.5 w-3.5" style={{ color: 'var(--color-accent)' }} />
+                    )}
                   </button>
                 );
               })}
@@ -202,7 +268,6 @@ export const CreateSectionModal: React.FC = () => {
           </div>
         )}
 
-        {/* Footer Buttons */}
         <div
           className="flex justify-end gap-2.5 border-t pt-4"
           style={{ borderColor: 'var(--color-border)' }}
@@ -217,12 +282,10 @@ export const CreateSectionModal: React.FC = () => {
           <button
             type="submit"
             disabled={!name.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all disabled:opacity-40"
-            style={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-            }}
+            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md transition-all disabled:opacity-40"
+            style={{ background: 'var(--color-accent)' }}
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="h-3.5 w-3.5" />
             <span>Create Section</span>
           </button>
         </div>

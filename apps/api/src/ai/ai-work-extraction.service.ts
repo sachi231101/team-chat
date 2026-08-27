@@ -157,13 +157,15 @@ ${sourceContent}`;
         approvals: parsed.approvals || [],
       };
     } catch (err) {
-      this.logger.error(`Work extraction failed: ${(err as Error).message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.error(`Work extraction failed: ${message}`);
       return {
         tasks: [],
         decisions: [],
         risks: [],
         approvals: [],
-        summary: `Failed to extract work items: ${(err as Error).message}`,
+        summary: 'Could not analyze this conversation.',
+        error: message,
       };
     }
   }

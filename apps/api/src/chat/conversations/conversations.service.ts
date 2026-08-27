@@ -1,6 +1,13 @@
-import { Injectable, NotFoundException, InternalServerErrorException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { ChatAccessService } from '../../common/chat-access.service';
+import { throwInternal } from '../../common/safe-internal-error';
 import { Conversation } from '@team-chat/shared';
 
 @Injectable()
@@ -34,9 +41,7 @@ export class ConversationsService {
         updatedAt: c.updatedAt.toISOString(),
       }));
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to fetch conversations: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch conversations', error);
     }
   }
 
@@ -61,9 +66,7 @@ export class ConversationsService {
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch conversation ${id}: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch conversation', error);
     }
   }
 
@@ -74,34 +77,46 @@ export class ConversationsService {
     try {
       await this.chatAccess.assertUsersBelongToWorkplace(wpId, uniqueParticipants);
 
-      const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
-      if (existing) return existing;
+      // Serializable find-or-create reduces duplicate DMs under concurrent creates.
+      const conversation = await this.prisma.$transaction(
+        async (tx) => {
+          const existing = await this.findMatchingConversationTx(tx, wpId, uniqueParticipants);
+          if (existing) return existing;
 
-      const c = await this.prisma.$transaction(async (tx) => {
-        return tx.conversation.create({
-          data: {
-            workplaceId: wpId,
-            participants: {
-              create: uniqueParticipants.map((userId) => ({ userId })),
+          return tx.conversation.create({
+            data: {
+              workplaceId: wpId,
+              participants: {
+                create: uniqueParticipants.map((userId) => ({ userId })),
+              },
             },
-          },
-          include: { participants: true },
-        });
-      });
+            include: { participants: true },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
 
       return {
-        id: c.id,
-        participants: c.participants.map((p) => p.userId),
-        workplaceId: c.workplaceId,
+        id: conversation.id,
+        participants: conversation.participants.map((p) => p.userId),
+        workplaceId: conversation.workplaceId,
         unreadCount: 0,
-        createdAt: c.createdAt.toISOString(),
-        updatedAt: c.updatedAt.toISOString(),
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
       };
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof ForbiddenException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to create conversation: ${(error as Error).message}`,
-      );
+
+      // Concurrent serializable transactions may conflict — retry once as find.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
+        const existing = await this.findMatchingConversation(wpId, uniqueParticipants);
+        if (existing) return existing;
+      }
+
+      throwInternal('Failed to create conversation', error);
     }
   }
 
@@ -109,20 +124,7 @@ export class ConversationsService {
     workplaceId: string,
     participantIds: string[],
   ): Promise<Conversation | null> {
-    const wanted = [...participantIds].sort();
-    const convos = await this.prisma.conversation.findMany({
-      where: {
-        workplaceId,
-        participants: { some: { userId: { in: wanted } } },
-      },
-      include: { participants: true },
-    });
-
-    const match = convos.find((c) => {
-      const ids = c.participants.map((p) => p.userId).sort();
-      return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
-    });
-
+    const match = await this.findMatchingConversationTx(this.prisma, workplaceId, participantIds);
     if (!match) return null;
 
     return {
@@ -134,5 +136,26 @@ export class ConversationsService {
       updatedAt: match.updatedAt.toISOString(),
     };
   }
-}
 
+  private async findMatchingConversationTx(
+    db: Prisma.TransactionClient | PrismaService,
+    workplaceId: string,
+    participantIds: string[],
+  ) {
+    const wanted = [...participantIds].sort();
+    const convos = await db.conversation.findMany({
+      where: {
+        workplaceId,
+        participants: { some: { userId: { in: wanted } } },
+      },
+      include: { participants: true },
+    });
+
+    return (
+      convos.find((c) => {
+        const ids = c.participants.map((p) => p.userId).sort();
+        return ids.length === wanted.length && ids.every((id, i) => id === wanted[i]);
+      }) ?? null
+    );
+  }
+}

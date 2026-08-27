@@ -42,9 +42,6 @@ export async function provisionUserPublicChannels(
           createdById: creatorId,
         },
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7478/ingest/00f10b65-0a04-4e60-b5e9-07d47622c725',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d06bbf'},body:JSON.stringify({sessionId:'d06bbf',runId:'post-fix',hypothesisId:'A',location:'default-channels.ts:create',message:'created missing default channel',data:{name:def.name,channelId:channel.id,userId},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     }
 
     await prisma.channelMember.upsert({
@@ -74,8 +71,4 @@ export async function provisionUserPublicChannels(
       update: {},
     });
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7478/ingest/00f10b65-0a04-4e60-b5e9-07d47622c725',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d06bbf'},body:JSON.stringify({sessionId:'d06bbf',runId:'post-fix',hypothesisId:'A',location:'default-channels.ts:done',message:'provisioned public channel memberships',data:{userId,workplaceId,channels:publicChannels.map((c)=>c.name)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 }

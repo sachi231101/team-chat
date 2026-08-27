@@ -61,8 +61,9 @@ export interface Message {
     tags?: MessageTag[];
     actionItems?: ActionItem[];
     poll?: Poll;
-    pinned?: boolean;
-    editedAt?: string;
+  pinned?: boolean;
+  scheduledFor?: string;
+  editedAt?: string;
     deliveryStatus?: 'sending' | 'sent' | 'failed';
     createdAt: string;
     updatedAt: string;

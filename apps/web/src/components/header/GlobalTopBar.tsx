@@ -1,12 +1,16 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu, Bot, Sun, Users, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Search, HelpCircle, Bell, Menu, Bot } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUiStore } from '../../stores';
 import { useWorkspace } from '../../hooks';
 import { Tooltip } from '../ui';
+import { NotificationsPopover } from './NotificationsPopover';
+import { HelpPopover } from './HelpPopover';
 
 export const GlobalTopBar: React.FC = () => {
   const navigate = useNavigate();
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const {
     setSearchModalOpen,
     toggleSidebar,
@@ -14,8 +18,6 @@ export const GlobalTopBar: React.FC = () => {
     navStack,
     aiPanelOpen,
     toggleAiPanel,
-    setDailyBriefingOpen,
-    setMultiAgentStudioOpen,
   } = useUiStore();
   const { notifications } = useWorkspace();
   const unread = notifications.filter((n) => n.unread).length;
@@ -43,7 +45,6 @@ export const GlobalTopBar: React.FC = () => {
       className="flex h-[49px] w-full shrink-0 items-center gap-2 px-3"
       style={{ background: 'var(--color-rail)', borderBottom: '1px solid var(--color-border)' }}
     >
-      {/* Left: back / forward / history */}
       <div className="flex items-center gap-0.5 shrink-0">
         <button
           className="flex h-7 w-7 items-center justify-center rounded-md md:hidden hover-surface"
@@ -75,7 +76,6 @@ export const GlobalTopBar: React.FC = () => {
         </button>
       </div>
 
-      {/* Center: global search bar */}
       <button
         onClick={() => setSearchModalOpen(true)}
         className="flex flex-1 max-w-2xl mx-auto items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs transition-all"
@@ -103,81 +103,74 @@ export const GlobalTopBar: React.FC = () => {
         </kbd>
       </button>
 
-      {/* Right: AI Assistant + Daily Briefing + Swarm + Help + Bell */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* Daily Briefing button */}
-        <Tooltip content="Personal Daily Briefing" side="bottom">
-          <button
-            type="button"
-            onClick={() => setDailyBriefingOpen(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25 hover:scale-105 transition-all"
-            aria-label="Open Daily Briefing"
-          >
-            <Sun className="h-4 w-4 text-amber-400" />
-          </button>
-        </Tooltip>
-
-        {/* Multi-Agent Swarm Studio button */}
-        <Tooltip content="Multi-Agent Swarm Studio" side="bottom">
-          <button
-            type="button"
-            onClick={() => setMultiAgentStudioOpen(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 hover:bg-cyan-500/25 hover:scale-105 transition-all"
-            aria-label="Open Multi-Agent Studio"
-          >
-            <Users className="h-4 w-4 text-cyan-400" />
-          </button>
-        </Tooltip>
-
-        {/* AI Assistant button */}
-        <Tooltip content={aiPanelOpen ? "Close AI Assistant" : "Open AI Assistant"} side="bottom">
+        <Tooltip content={aiPanelOpen ? 'Close WorkspaceAgent' : 'Message WorkspaceAgent'} side="bottom">
           <button
             type="button"
             onClick={toggleAiPanel}
-            className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition-all ${
-              aiPanelOpen
-                ? 'ring-2 ring-violet-400 scale-105 shadow-md shadow-violet-500/25'
-                : 'hover:opacity-90 hover:scale-105'
-            }`}
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
             style={{
-              background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)',
-              color: '#ffffff',
+              background: aiPanelOpen ? 'var(--color-accent-muted)' : 'transparent',
+              color: aiPanelOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)',
             }}
-            aria-label="Toggle AI Assistant"
+            aria-label="Toggle WorkspaceAgent"
           >
-            <Bot className="h-4 w-4 drop-shadow-sm" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-            </span>
+            <Bot className="h-4 w-4" />
           </button>
         </Tooltip>
 
-        <button
-          className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
-          style={{ color: 'var(--color-text-secondary)' }}
-          aria-label="Help"
-        >
-          <HelpCircle className="h-4 w-4" />
-        </button>
-
-        <button
-          className="relative flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-white/5"
-          style={{ color: 'var(--color-text-secondary)' }}
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-          {unread > 0 && (
-            <span
-              className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
-              style={{ background: 'var(--color-badge)' }}
+        <div className="relative">
+          <Tooltip content="Help" side="bottom">
+            <button
+              type="button"
+              onClick={() => {
+                setNotifOpen(false);
+                setHelpOpen((open) => !open);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
+              style={{
+                color: helpOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                background: helpOpen ? 'var(--color-accent-muted)' : 'transparent',
+              }}
+              aria-label="Help"
+              aria-expanded={helpOpen}
             >
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </button>
+              <HelpCircle className="h-4 w-4" />
+            </button>
+          </Tooltip>
+          <HelpPopover isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+        </div>
+
+        <div className="relative">
+          <Tooltip content="Notifications" side="bottom">
+            <button
+              type="button"
+              onClick={() => {
+                setHelpOpen(false);
+                setNotifOpen((open) => !open);
+              }}
+              className="relative flex h-7 w-7 items-center justify-center rounded-md transition-colors hover-surface"
+              style={{
+                color: notifOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                background: notifOpen ? 'var(--color-accent-muted)' : 'transparent',
+              }}
+              aria-label="Notifications"
+              aria-expanded={notifOpen}
+            >
+              <Bell className="h-4 w-4" />
+              {unread > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                  style={{ background: 'var(--color-badge)' }}
+                >
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+          </Tooltip>
+          <NotificationsPopover isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
+        </div>
       </div>
     </div>
   );
 };
-

@@ -30,7 +30,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ isOp
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-4 top-14 z-50 w-80 sm:w-96 rounded-2xl border border-slate-700/80 bg-slate-900 p-4 shadow-2xl shadow-black/80 animate-in fade-in zoom-in-95">
+      <div className="absolute right-0 top-9 z-50 w-80 sm:w-96 rounded-2xl border border-slate-700/80 bg-slate-900 p-4 shadow-2xl shadow-black/80 animate-in fade-in zoom-in-95">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-indigo-400" />

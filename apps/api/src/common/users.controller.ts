@@ -8,9 +8,9 @@ import {
   Body,
   NotFoundException,
   ForbiddenException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { throwInternal } from './safe-internal-error';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePresenceDto } from '../presence/dto/update-presence.dto';
@@ -45,9 +45,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       }));
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to fetch users: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch users', error);
     }
   }
 
@@ -74,9 +72,7 @@ export class UsersController {
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException(
-        `Failed to fetch user ${id}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to fetch user ${id}`, error);
     }
   }
 
@@ -116,9 +112,7 @@ export class UsersController {
         createdAt: u.createdAt.toISOString(),
       };
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to create user: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to create user', error);
     }
   }
 
@@ -171,9 +165,7 @@ export class UsersController {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
-      throw new InternalServerErrorException(
-        `Failed to update user ${id}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to update user ${id}`, error);
     }
   }
 
@@ -220,9 +212,7 @@ export class UsersController {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
-      throw new InternalServerErrorException(
-        `Failed to update status for user ${id}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to update status for user ${id}`, error);
     }
   }
 
@@ -247,9 +237,7 @@ export class UsersController {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${id} not found`);
       }
-      throw new InternalServerErrorException(
-        `Failed to delete user ${id}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to delete user ${id}`, error);
     }
   }
 }

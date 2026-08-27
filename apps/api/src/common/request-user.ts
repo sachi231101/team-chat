@@ -18,49 +18,6 @@ export interface RequestUser {
   permissions: string[];
 }
 
-export function readUserFromHeaders(headers: Record<string, unknown> | undefined): RequestUser {
-  const rawUser = headers?.['x-user-id'];
-  const rawWorkplace = headers?.['x-workplace-id'];
-  const rawRole = headers?.['x-user-role'];
-  const rawPermissions = headers?.['x-user-permissions'];
-
-  const userIdVal = Array.isArray(rawUser) ? rawUser[0] : rawUser;
-  const workplaceIdVal = Array.isArray(rawWorkplace) ? rawWorkplace[0] : rawWorkplace;
-  const roleVal = Array.isArray(rawRole) ? rawRole[0] : rawRole;
-  const permissionsVal = Array.isArray(rawPermissions) ? rawPermissions[0] : rawPermissions;
-
-  const finalUserId =
-    typeof userIdVal === 'string' && userIdVal.trim()
-      ? userIdVal.trim()
-      : DEFAULT_MOCK_USER_ID;
-
-  const finalWorkplaceId =
-    typeof workplaceIdVal === 'string' && workplaceIdVal.trim()
-      ? workplaceIdVal.trim()
-      : DEFAULT_WORKPLACE_ID;
-
-  const finalRole =
-    typeof roleVal === 'string' && roleVal.trim()
-      ? roleVal.trim()
-      : DEFAULT_ROLE;
-
-  let finalPermissions: string[] = DEFAULT_PERMISSIONS;
-  if (typeof permissionsVal === 'string' && permissionsVal.trim()) {
-    finalPermissions = permissionsVal
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-  }
-
-  return {
-    userId: finalUserId,
-    id: finalUserId,
-    workplaceId: finalWorkplaceId,
-    role: finalRole,
-    permissions: finalPermissions,
-  };
-}
-
 export function normalizeUser(partial: {
   id?: string;
   userId?: string;
@@ -78,6 +35,3 @@ export function normalizeUser(partial: {
     permissions: partial.permissions || DEFAULT_PERMISSIONS,
   };
 }
-
-
-

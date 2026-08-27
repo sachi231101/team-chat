@@ -152,15 +152,57 @@ export class ChatAccessService {
     workplaceId?: string,
   ) {
     const user = this.extractUser(userOrId, workplaceId);
-    const channel = await this.assertChannelAccess(user, channelId);
-
-    // Caller must be an existing member of the channel
-    const member = await this.prisma.channelMember.findUnique({
-      where: { channelId_userId: { channelId, userId: user.userId } },
+    // Membership management always requires membership (public and private).
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      include: { members: true },
     });
 
-    if (!member && channel.type === ChannelType.PRIVATE) {
-      throw new ForbiddenException('You must be a member to manage channel membership');
+    if (!channel || channel.workplaceId !== user.workplaceId) {
+      throw new NotFoundException(`Channel ${channelId} not found in this workplace`);
+    }
+
+    const member = channel.members.find((m) => m.userId === user.userId);
+    // Creator always retains manage rights; everyone else must be an admin member.
+    if (!member && channel.createdById !== user.userId) {
+      throw new ForbiddenException(
+        'Access denied: You must be a channel member to manage membership',
+      );
+    }
+
+    const isAdmin =
+      channel.createdById === user.userId ||
+      member?.role === ChannelMemberRole.ADMIN;
+    if (!isAdmin) {
+      throw new ForbiddenException(
+        'Only channel admins can add or remove other members',
+      );
+    }
+
+    return channel;
+  }
+
+  /** Self-leave / membership check without requiring admin. */
+  async assertChannelMembership(
+    userOrId: UserContext | string,
+    channelId: string,
+    workplaceId?: string,
+  ) {
+    const user = this.extractUser(userOrId, workplaceId);
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      include: { members: true },
+    });
+
+    if (!channel || channel.workplaceId !== user.workplaceId) {
+      throw new NotFoundException(`Channel ${channelId} not found in this workplace`);
+    }
+
+    const member = channel.members.find((m) => m.userId === user.userId);
+    if (!member) {
+      throw new ForbiddenException(
+        'Access denied: You are not a member of this channel',
+      );
     }
 
     return channel;

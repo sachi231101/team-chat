@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { throwInternal } from '../common/safe-internal-error';
 import { User, UserStatus as SharedUserStatus } from '@team-chat/shared';
 import { UserStatus as PrismaUserStatus } from '@prisma/client';
 import { isPrismaNotFound } from '../common/prisma-errors';
@@ -21,9 +22,7 @@ export class PresenceService {
         statusMessage: u.statusMessage ?? undefined,
       }));
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to fetch presence: ${(error as Error).message}`,
-      );
+      throwInternal('Failed to fetch presence', error);
     }
   }
 
@@ -57,9 +56,7 @@ export class PresenceService {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException(`User ${userId} not found`);
       }
-      throw new InternalServerErrorException(
-        `Failed to update presence for ${userId}: ${(error as Error).message}`,
-      );
+      throwInternal(`Failed to update presence for ${userId}`, error);
     }
   }
 }

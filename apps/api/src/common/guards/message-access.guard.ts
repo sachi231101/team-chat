@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ChatAccessService } from '../chat-access.service';
-import { readUserFromHeaders, RequestUser } from '../request-user';
+import { attachMockIdentity } from '../mock-identity';
 
 @Injectable()
 export class MessageAccessGuard implements CanActivate {
@@ -8,8 +8,7 @@ export class MessageAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const user: RequestUser = req.user || readUserFromHeaders(req.headers);
-    req.user = user;
+    const user = attachMockIdentity(req);
 
     const channelId = req.query?.channelId || req.body?.channelId;
     const conversationId = req.query?.conversationId || req.body?.conversationId;
@@ -34,7 +33,7 @@ export class MessageAccessGuard implements CanActivate {
       return true;
     }
 
+    // List/create endpoints validate required scope in the service layer.
     return true;
   }
 }
-

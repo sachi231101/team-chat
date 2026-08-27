@@ -33,6 +33,8 @@ export interface WorkExtractionResult {
     risks: ExtractedRisk[];
     approvals: ExtractedApproval[];
     summary: string;
+    /** Present when the LLM call or parse failed; UI should show an error state. */
+    error?: string;
 }
 export interface CitationItem {
     index: number;

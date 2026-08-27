@@ -69,10 +69,8 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
     const cleanQuery = query.toLowerCase().trim();
     const list: MentionItem[] = [];
 
-    // Only show actual human members (exclude agents and channels from @ mentions)
-    const filteredMembers = channelMembers.filter((u) => !u.id.startsWith('usr-agent-'));
-
-    const visible = filteredMembers.filter(
+    // Humans + AI apps (Slack-like @bot mentions)
+    const visible = channelMembers.filter(
       (m) =>
         m.name.toLowerCase().includes(cleanQuery) ||
         m.email.toLowerCase().includes(cleanQuery) ||
@@ -80,13 +78,14 @@ export const MentionDropdown: React.FC<MentionDropdownProps> = ({
     );
 
     visible.forEach((u) => {
+      const isAgent = u.id.startsWith('usr-agent-');
       list.push({
         id: u.id,
         name: u.name,
-        subtitle: u.title || u.email,
+        subtitle: isAgent ? 'App' : u.title || u.email,
         avatarUrl: u.avatarUrl,
         status: u.status,
-        isSpecial: false,
+        isSpecial: isAgent,
       });
     });
 

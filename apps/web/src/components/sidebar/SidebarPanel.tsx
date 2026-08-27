@@ -263,7 +263,14 @@ export const SidebarPanel: React.FC = () => {
                 )}
                 <Star className="h-3.5 w-3.5 shrink-0 text-amber-400 fill-amber-400/20" />
                 <span>Starred</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-800 text-stone-400 font-normal">
+                <span
+                  className="text-[10px] px-1.5 py-0.2 rounded-full font-normal"
+                  style={{
+                    background: 'var(--color-elevated)',
+                    color: 'var(--color-text-tertiary)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
                   {starredChannels.length}
                 </span>
               </button>
@@ -298,7 +305,14 @@ export const SidebarPanel: React.FC = () => {
               )}
               <Hash className="h-3.5 w-3.5 shrink-0" />
               <span>Channels</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-800 text-stone-400 font-normal">
+              <span
+                className="text-[10px] px-1.5 py-0.2 rounded-full font-normal"
+                style={{
+                  background: 'var(--color-elevated)',
+                  color: 'var(--color-text-tertiary)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
                 {unstarredChannels.length}
               </span>
             </button>

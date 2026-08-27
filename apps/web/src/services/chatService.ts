@@ -113,6 +113,7 @@ export const chatService = {
     channelId?: string;
     conversationId?: string;
     parentMessageId?: string;
+    scheduledFor?: string;
     attachments?: { name: string; url: string; size: number; type: string }[];
   }) =>
     apiClient<Message>('/messages', {
@@ -155,12 +156,14 @@ export const chatService = {
   // Action Items (Pillar 5)
   getActionItems: (params?: {
     channelId?: string;
+    conversationId?: string;
     assigneeId?: string;
     status?: string;
     messageId?: string;
   }) => {
     const qs = new URLSearchParams();
     if (params?.channelId) qs.append('channelId', params.channelId);
+    if (params?.conversationId) qs.append('conversationId', params.conversationId);
     if (params?.assigneeId) qs.append('assigneeId', params.assigneeId);
     if (params?.status) qs.append('status', params.status);
     if (params?.messageId) qs.append('messageId', params.messageId);
@@ -214,8 +217,13 @@ export const chatService = {
     }),
 
   // Search
-  search: (query: string) =>
-    apiClient<{ messages: Message[]; channels: Channel[]; users: User[] }>(`/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, scope: 'all' | 'channels' | 'people' | 'messages' = 'all') =>
+    apiClient<{
+      messages: Message[];
+      channels: Channel[];
+      users: User[];
+      scope?: string;
+    }>(`/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`),
 
   getAiStatus: () =>
     apiClient<{ enabled: boolean; provider: string; model: string; configured: boolean }>('/ai/status'),
