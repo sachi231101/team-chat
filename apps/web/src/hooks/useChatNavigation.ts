@@ -18,7 +18,7 @@ function entryState(entry: NavEntry) {
   return {
     activeId: entry.id,
     activeType: entry.type,
-    activeRailTab: entry.type === 'channel' ? ('home' as const) : ('dms' as const),
+    activeRailTab: 'home' as const,
     chatHeaderTab: 'messages' as const,
   };
 }

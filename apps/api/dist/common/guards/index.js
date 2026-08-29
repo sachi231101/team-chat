@@ -17,4 +17,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./channel-member.guard"), exports);
 __exportStar(require("./conversation-participant.guard"), exports);
 __exportStar(require("./message-access.guard"), exports);
+__exportStar(require("./identity.guard"), exports);
+__exportStar(require("./permissions.guard"), exports);
 //# sourceMappingURL=index.js.map

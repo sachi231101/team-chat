@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { getApiBaseUrl } from '../lib/env';
 import {
   Channel,
   Conversation,
@@ -502,7 +503,7 @@ export const chatService = {
 
   uploadAttachment: async (file: File) => {
 
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const API_BASE_URL = getApiBaseUrl();
     const form = new FormData();
     form.append('file', file);
     const response = await fetch(`${API_BASE_URL}/attachments/upload`, {

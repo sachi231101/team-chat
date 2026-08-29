@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationParticipantGuard } from '../../common/guards';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { RequestUser } from '../../common/request-user';
 
 @Controller('conversations')
@@ -21,6 +21,7 @@ export class ConversationsController {
   }
 
   @Post()
+  @RequirePermissions('conversation:write')
   create(@CurrentUser() user: RequestUser, @Body() body: CreateConversationDto) {
     const participants = Array.from(new Set([user.userId, ...(body.participants || [])]));
     return this.conversationsService.create({

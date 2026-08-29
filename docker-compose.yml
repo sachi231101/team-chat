@@ -17,5 +17,144 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: teamchat-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    # Host port omitted: 6379 is often already taken. Stack services use redis:6379 on the compose network.
+    # For a published port, add: '6379:6379' (or '6380:6379' if 6379 is busy).
+    volumes:
+      - teamchat_redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  team-chat-api:
+    profiles: [stack]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: apps/api/.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/teamchat?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_REQUIRED: 'true'
+      REDIS_CONNECT_TIMEOUT_MS: 8000
+      SESSION_ENABLED: 'true'
+      SESSION_SECRET: ${SESSION_SECRET:-team-chat-dev-session}
+      TRUST_PROXY: 'true'
+      ALLOW_MOCK_IDENTITY: 'true'
+      ALLOWED_ORIGINS: http://localhost,http://127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  web:
+    profiles: [stack]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: ''
+    restart: unless-stopped
+    depends_on:
+      team-chat-api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  identity-api:
+    profiles: [stack]
+    build:
+      context: ./infra/stubs/placeholder-api
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: identity
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  workplace-api:
+    profiles: [stack]
+    build:
+      context: ./infra/stubs/placeholder-api
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: workplace
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  nginx:
+    profiles: [stack]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      team-chat-api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      identity-api:
+        condition: service_healthy
+      workplace-api:
+        condition: service_healthy
+
 volumes:
   teamchat_pgdata:
+  teamchat_redis:

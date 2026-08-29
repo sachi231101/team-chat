@@ -1,8 +1,9 @@
 import { io, Socket } from 'socket.io-client';
 import { Message, User } from '@team-chat/shared';
 import { getStoredUserId } from '../lib/currentUser';
+import { getWsUrl } from '../lib/env';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL = getWsUrl();
 
 class SocketService {
   private socket: Socket | null = null;

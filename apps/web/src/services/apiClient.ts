@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from '../lib/env';
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Returns the current user ID and workplace ID from localStorage.

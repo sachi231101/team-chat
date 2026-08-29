@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from './env';
+
+const API_BASE_URL = getApiBaseUrl();
 
 /** Append mock identity query so <img>/<a> can hit gated /uploads without custom headers. */
 function withMockIdentity(url: string): string {

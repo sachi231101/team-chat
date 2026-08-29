@@ -14,7 +14,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { ToggleReactionDto } from '../reactions/dto/toggle-reaction.dto';
 import { MessageAccessGuard } from '../../common/guards';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { RequestUser } from '../../common/request-user';
 
 @Controller('messages')
@@ -67,6 +67,7 @@ export class MessagesController {
   }
 
   @Post()
+  @RequirePermissions('chat:write')
   create(@CurrentUser() user: RequestUser, @Body() body: CreateMessageDto) {
     return this.messagesService.create(user, body);
   }

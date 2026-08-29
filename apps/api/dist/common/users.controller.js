@@ -22,6 +22,7 @@ const update_presence_dto_1 = require("../presence/dto/update-presence.dto");
 const prisma_errors_1 = require("./prisma-errors");
 const default_channels_1 = require("./default-channels");
 const decorators_1 = require("./decorators");
+const workplace_read_cache_interceptor_1 = require("../redis/workplace-read-cache.interceptor");
 let UsersController = class UsersController {
     prisma;
     constructor(prisma) {
@@ -224,6 +225,7 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Get)(),
+    (0, common_1.UseInterceptors)(workplace_read_cache_interceptor_1.WorkplaceReadCacheInterceptor),
     __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
