@@ -56,6 +56,7 @@ __decorate([
 ], ConversationsController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, decorators_1.RequirePermissions)('conversation:write'),
     __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),

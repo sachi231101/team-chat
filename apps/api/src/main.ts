@@ -2,11 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import session from 'express-session';
+import { RedisStore } from 'connect-redis';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters';
 import { UPLOAD_DIR } from './attachments/attachments.service';
 import { RedisIoAdapter } from './realtime/redis-io.adapter';
+import { RedisService } from './redis/redis.service';
 
 function allowedOrigins(): (string | RegExp)[] {
   const raw = process.env.ALLOWED_ORIGINS || '';
@@ -20,6 +23,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
 
+  if (process.env.TRUST_PROXY === 'true') {
+    app.set('trust proxy', 1);
+  }
+
   const redisIoAdapter = new RedisIoAdapter(app);
   await redisIoAdapter.connectToRedis();
   app.useWebSocketAdapter(redisIoAdapter);
@@ -27,7 +34,6 @@ async function bootstrap() {
   if (!existsSync(UPLOAD_DIR)) {
     mkdirSync(UPLOAD_DIR, { recursive: true });
   }
-  // Uploads are served via authenticated AttachmentsController / UploadsController — not public static.
 
   app.use(
     helmet({
@@ -36,6 +42,35 @@ async function bootstrap() {
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
+
+  if (process.env.SESSION_ENABLED === 'true') {
+    const redis = app.get(RedisService);
+    if (!redis.isReady) {
+      if (process.env.REDIS_REQUIRED === 'true') {
+        throw new Error('SESSION_ENABLED requires Redis');
+      }
+      logger.warn('SESSION_ENABLED is set but Redis is not ready; skipping shared sessions');
+    } else {
+      app.use(
+        session({
+          store: new RedisStore({
+            client: redis.getClient(),
+            prefix: 'sess:',
+          }) as unknown as session.Store,
+          secret: process.env.SESSION_SECRET || 'team-chat-dev-session',
+          resave: false,
+          saveUninitialized: false,
+          proxy: process.env.TRUST_PROXY === 'true',
+          cookie: {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: false,
+          },
+        }),
+      );
+      logger.log('Redis-backed express-session enabled');
+    }
+  }
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -56,7 +91,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false,
+      forbidNonWhitelisted: true,
       transformOptions: {
         enableImplicitConversion: true,
       },
@@ -71,4 +106,3 @@ async function bootstrap() {
 }
 
 void bootstrap();
-

@@ -8,6 +8,7 @@ import {
   Body,
   NotFoundException,
   ForbiddenException,
+  UseInterceptors,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { throwInternal } from './safe-internal-error';
@@ -20,12 +21,14 @@ import { User, UserStatus } from '@team-chat/shared';
 import { provisionUserPublicChannels } from './default-channels';
 import { CurrentUser } from './decorators';
 import type { RequestUser } from './request-user';
+import { WorkplaceReadCacheInterceptor } from '../redis/workplace-read-cache.interceptor';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @UseInterceptors(WorkplaceReadCacheInterceptor)
   async findAll(@CurrentUser() user: RequestUser): Promise<User[]> {
     try {
       const users = await this.prisma.user.findMany({

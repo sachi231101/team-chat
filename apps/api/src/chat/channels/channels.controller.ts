@@ -6,19 +6,22 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { AddChannelMembersDto } from './dto/add-member.dto';
 import { ChannelMemberGuard } from '../../common/guards';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { RequestUser } from '../../common/request-user';
+import { WorkplaceReadCacheInterceptor } from '../../redis/workplace-read-cache.interceptor';
 
 @Controller('channels')
 export class ChannelsController {
   constructor(private readonly channelsService: ChannelsService) {}
 
   @Get()
+  @UseInterceptors(WorkplaceReadCacheInterceptor)
   findAll(@CurrentUser() user: RequestUser) {
     return this.channelsService.findAll(user.workplaceId, user.userId);
   }
@@ -30,6 +33,7 @@ export class ChannelsController {
   }
 
   @Post()
+  @RequirePermissions('channel:create')
   create(@CurrentUser() user: RequestUser, @Body() body: CreateChannelDto) {
     return this.channelsService.create({
       ...body,

@@ -107,11 +107,29 @@ export function resolveMockIdentityFromHandshake(input: {
   return resolveMockIdentityFromHeaders(input.headers);
 }
 
+function mergeQueryIdentityHeaders(req: {
+  headers?: Record<string, unknown>;
+  query?: Record<string, unknown>;
+}): Record<string, unknown> | undefined {
+  const headers: Record<string, unknown> = { ...(req.headers || {}) };
+  const query = req.query || {};
+  if (!headers['x-user-id'] && query['x-user-id']) {
+    headers['x-user-id'] = query['x-user-id'];
+  }
+  if (!headers['x-workplace-id'] && query['x-workplace-id']) {
+    headers['x-workplace-id'] = query['x-workplace-id'];
+  }
+  return headers;
+}
+
 /** Attach / normalize identity on an HTTP request object. */
 export function attachMockIdentity(req: {
   user?: Partial<RequestUser> & { id?: string; userId?: string };
   headers?: Record<string, unknown>;
+  query?: Record<string, unknown>;
 }): RequestUser {
+  req.headers = mergeQueryIdentityHeaders(req);
+
   if (req.user?.userId || req.user?.id) {
     const uid = (req.user.userId || req.user.id) as string;
     const headerFallback = resolveMockIdentityFromHeaders(req.headers);

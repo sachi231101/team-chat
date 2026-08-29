@@ -19,6 +19,7 @@ const create_channel_dto_1 = require("./dto/create-channel.dto");
 const add_member_dto_1 = require("./dto/add-member.dto");
 const guards_1 = require("../../common/guards");
 const decorators_1 = require("../../common/decorators");
+const workplace_read_cache_interceptor_1 = require("../../redis/workplace-read-cache.interceptor");
 let ChannelsController = class ChannelsController {
     channelsService;
     constructor(channelsService) {
@@ -50,6 +51,7 @@ let ChannelsController = class ChannelsController {
 exports.ChannelsController = ChannelsController;
 __decorate([
     (0, common_1.Get)(),
+    (0, common_1.UseInterceptors)(workplace_read_cache_interceptor_1.WorkplaceReadCacheInterceptor),
     __param(0, (0, decorators_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -66,6 +68,7 @@ __decorate([
 ], ChannelsController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, decorators_1.RequirePermissions)('channel:create'),
     __param(0, (0, decorators_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),

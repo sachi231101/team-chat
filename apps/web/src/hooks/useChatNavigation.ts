@@ -18,7 +18,7 @@ function entryState(entry: NavEntry) {
   return {
     activeId: entry.id,
     activeType: entry.type,
-    activeRailTab: 'chat' as const,
+    activeRailTab: 'home' as const,
     chatHeaderTab: 'messages' as const,
   };
 }

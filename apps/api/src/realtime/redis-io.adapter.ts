@@ -18,6 +18,9 @@ export class RedisIoAdapter extends IoAdapter {
         : null);
 
     if (!redisUrl) {
+      if (process.env.REDIS_REQUIRED === 'true') {
+        throw new Error('REDIS_URL (or REDIS_HOST) is required for Socket.IO');
+      }
       this.logger.log(
         'No REDIS_URL or REDIS_HOST provided. Socket.IO is using the default in-memory adapter.',
       );
@@ -62,14 +65,17 @@ export class RedisIoAdapter extends IoAdapter {
       this.adapterConstructor = createAdapter(pubClient, subClient);
       this.logger.log(`Socket.IO Redis adapter connected to ${redisUrl}`);
     } catch (error) {
-      this.logger.warn(
-        `Failed to connect to Redis (${(error as Error).message}). Falling back to in-memory adapter.`,
-      );
       this.adapterConstructor = null;
       await Promise.allSettled([
         pubClient?.isOpen ? pubClient.quit() : Promise.resolve(),
         subClient?.isOpen ? subClient.quit() : Promise.resolve(),
       ]);
+      if (process.env.REDIS_REQUIRED === 'true') {
+        throw error;
+      }
+      this.logger.warn(
+        `Failed to connect to Redis (${(error as Error).message}). Falling back to in-memory adapter.`,
+      );
     }
   }
 

@@ -13,6 +13,7 @@ const throttler_1 = require("@nestjs/throttler");
 const core_1 = require("@nestjs/core");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
+const health_controller_1 = require("./health.controller");
 const common_module_1 = require("./common/common.module");
 const chat_module_1 = require("./chat/chat.module");
 const attachments_module_1 = require("./attachments/attachments.module");
@@ -21,6 +22,10 @@ const presence_module_1 = require("./presence/presence.module");
 const search_module_1 = require("./search/search.module");
 const realtime_module_1 = require("./realtime/realtime.module");
 const ai_module_1 = require("./ai/ai.module");
+const redis_module_1 = require("./redis/redis.module");
+const redis_throttler_storage_1 = require("./redis/redis-throttler.storage");
+const redis_service_1 = require("./redis/redis.service");
+const guards_1 = require("./common/guards");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -31,12 +36,25 @@ exports.AppModule = AppModule = __decorate([
                 isGlobal: true,
                 envFilePath: ['.env', '../../.env'],
             }),
-            throttler_1.ThrottlerModule.forRoot([
-                {
-                    ttl: 60000,
-                    limit: process.env.NODE_ENV === 'production' ? 200 : 2000,
-                },
-            ]),
+            redis_module_1.RedisModule,
+            throttler_1.ThrottlerModule.forRootAsync({
+                imports: [redis_module_1.RedisModule],
+                inject: [redis_throttler_storage_1.RedisThrottlerStorage, redis_service_1.RedisService],
+                useFactory: (storage, redis) => ({
+                    storage: redis.isReady ? storage : undefined,
+                    throttlers: [
+                        {
+                            ttl: 60000,
+                            limit: process.env.NODE_ENV === 'production' ? 200 : 2000,
+                        },
+                    ],
+                    skipIf: (context) => {
+                        const req = context.switchToHttp().getRequest();
+                        const url = req.url || '';
+                        return url.startsWith('/health') || url.startsWith('/ready');
+                    },
+                }),
+            }),
             common_module_1.CommonModule,
             chat_module_1.ChatModule,
             attachments_module_1.AttachmentsModule,
@@ -46,9 +64,17 @@ exports.AppModule = AppModule = __decorate([
             realtime_module_1.RealtimeModule,
             ai_module_1.AiModule,
         ],
-        controllers: [app_controller_1.AppController],
+        controllers: [app_controller_1.AppController, health_controller_1.HealthController],
         providers: [
             app_service_1.AppService,
+            {
+                provide: core_1.APP_GUARD,
+                useClass: guards_1.IdentityGuard,
+            },
+            {
+                provide: core_1.APP_GUARD,
+                useClass: guards_1.PermissionsGuard,
+            },
             {
                 provide: core_1.APP_GUARD,
                 useClass: throttler_1.ThrottlerGuard,
