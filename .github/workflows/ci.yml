@@ -3,26 +3,40 @@ name: CI
 on:
   push:
     branches: [main, master]
+
   pull_request:
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter api prisma:generate
-      - run: pnpm --filter api test -- --passWithNoTests
-      - run: pnpm --filter api exec tsc --noEmit -p tsconfig.json
-      - run: pnpm --filter web exec tsc --noEmit -p tsconfig.app.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter api prisma:generate
+
+      - name: Run API tests
+        run: pnpm --filter api test -- --passWithNoTests
+
+      - name: Check API TypeScript
+        run: pnpm --filter api exec tsc --noEmit -p tsconfig.json
+
+      - name: Check Web TypeScript
+        run: pnpm --filter web exec tsc --noEmit -p tsconfig.app.json
