@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useUiStore } from '../../stores';
 import { useWorkspace, useChatMutations } from '../../hooks';
 import { Avatar } from '../ui';
+import { isAgentUserId } from '../../utils/isAgentUserId';
 import type { Conversation, User } from '@team-chat/shared';
 
 function isSelfConversation(convo: Conversation, currentUserId: string) {
@@ -24,7 +25,12 @@ export const DirectMessageList: React.FC = () => {
   const { createConversation } = useChatMutations();
 
   const selfConversation = conversations.find((c) => isSelfConversation(c, currentUser.id));
-  const otherConversations = conversations.filter((c) => !isSelfConversation(c, currentUser.id));
+  const otherConversations = conversations.filter((c) => {
+    if (isSelfConversation(c, currentUser.id)) return false;
+    const otherUserId =
+      c.participants.find((id) => id !== currentUser.id) || c.participants[0];
+    return !isAgentUserId(otherUserId);
+  });
   const selfIsActive = Boolean(
     selfConversation && activeType === 'conversation' && activeId === selfConversation.id,
   );

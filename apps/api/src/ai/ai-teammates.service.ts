@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { SearchService } from '../search/search.service';
 import type { RequestUser } from '../common/request-user';
@@ -13,7 +13,7 @@ export class AiTeammatesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly realtime: RealtimeService,
     private readonly search: SearchService,
   ) {}

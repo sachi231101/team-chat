@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import { AiContextService } from './ai-context.service';
 import type { RequestUser } from '../common/request-user';
 import type { DecisionRecord, DecisionStatus } from '@team-chat/shared';
@@ -11,7 +11,7 @@ export class AiDecisionsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly context: AiContextService,
   ) {}
 

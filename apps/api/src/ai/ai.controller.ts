@@ -14,7 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators';
 import type { RequestUser } from '../common/request-user';
 import { MessageAccessGuard } from '../common/guards';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import { AiContextService } from './ai-context.service';
 import { AiAssistantService } from './ai-assistant.service';
 import { AiOrchestratorService } from './ai-orchestrator.service';
@@ -57,7 +57,7 @@ const COMPOSE_PROMPTS: Record<ComposeAiDto['action'], string> = {
 @Throttle({ default: { limit: 60, ttl: 3_600_000 } })
 export class AiController {
   constructor(
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly context: AiContextService,
     private readonly assistant: AiAssistantService,
     private readonly orchestrator: AiOrchestratorService,
@@ -303,7 +303,7 @@ export class AiController {
   private assertReady() {
     if (!this.llm.isEnabled()) {
       throw new ServiceUnavailableException(
-        'AI is unavailable. Set AI_API_KEY and AI_ENABLED=true.',
+        'AI is unavailable. Set GEMINI_API_KEY and AI_ENABLED=true.',
       );
     }
   }
