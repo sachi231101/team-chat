@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import { SearchService } from '../search/search.service';
 import { AiContextService } from './ai-context.service';
 import { AiLearningService } from './ai-learning.service';
@@ -16,7 +16,7 @@ export class AiMultiAgentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly search: SearchService,
     private readonly context: AiContextService,
     private readonly learning: AiLearningService,

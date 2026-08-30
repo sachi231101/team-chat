@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import { AiContextService } from './ai-context.service';
 import { AiLearningService } from './ai-learning.service';
 import type { RequestUser } from '../common/request-user';
@@ -12,7 +12,7 @@ export class AiWorkExtractionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly context: AiContextService,
     private readonly learning: AiLearningService,
   ) {}

@@ -10,7 +10,10 @@ import { AiContextService } from './ai-context.service';
 import { AiOrchestratorService } from './ai-orchestrator.service';
 import { AiAssistantService } from './ai-assistant.service';
 import { AiToolsService } from './ai-tools.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
+import { GeminiProvider } from './llm/providers/gemini.provider';
+import { OpenAiProvider } from './llm/providers/openai.provider';
+import { AnthropicProvider } from './llm/providers/anthropic.provider';
 import { AiWorkExtractionService } from './ai-work-extraction.service';
 import { AiBriefingService } from './ai-briefing.service';
 import { AiMultiAgentService } from './ai-multi-agent.service';
@@ -30,7 +33,10 @@ import { AiTeammatesService } from './ai-teammates.service';
   ],
   controllers: [AiController],
   providers: [
-    NvidiaLlmService,
+    GeminiProvider,
+    OpenAiProvider,
+    AnthropicProvider,
+    LlmService,
     AiContextService,
     AiAssistantService,
     AiToolsService,
@@ -45,7 +51,7 @@ import { AiTeammatesService } from './ai-teammates.service';
   ],
   exports: [
     AiOrchestratorService,
-    NvidiaLlmService,
+    LlmService,
     AiWorkExtractionService,
     AiBriefingService,
     AiMultiAgentService,

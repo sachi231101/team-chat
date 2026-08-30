@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import type { RequestUser } from '../common/request-user';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class AiLearningService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
   ) {}
 
   async recordCorrection(

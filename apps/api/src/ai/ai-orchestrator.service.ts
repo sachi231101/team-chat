@@ -9,7 +9,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { AiContextService } from './ai-context.service';
 import { AiAssistantService } from './ai-assistant.service';
 import { AiToolsService } from './ai-tools.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import {
   AGENT_PERSONAS,
   AgentUserId,
@@ -36,7 +36,7 @@ export class AiOrchestratorService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly mentions: MentionsService,
     private readonly context: AiContextService,
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly realtime: RealtimeService,
     private readonly assistant: AiAssistantService,
     private readonly tools: AiToolsService,

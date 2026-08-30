@@ -13,16 +13,19 @@ import {
   Users,
   FolderPlus,
   Folder,
+  Sparkles,
 } from 'lucide-react';
 import { useUiStore } from '../../stores';
 import { useResizablePanel, useWorkspace } from '../../hooks';
 import { Tooltip } from '../ui';
 import { ResizeHandle } from '../common';
+import { isAgentUserId } from '../../utils/isAgentUserId';
 import { ChannelList } from './ChannelList';
 import { StarredChannelList } from './StarredChannelList';
 import { DirectMessageList } from './DirectMessageList';
 import { DirectMessagesSidebar } from './DirectMessagesSidebar';
 import { CustomSidebarSectionRow } from './CustomSidebarSectionRow';
+import { AiAppsList } from './AiAppsList';
 
 export const SidebarPanel: React.FC = () => {
   const {
@@ -37,11 +40,12 @@ export const SidebarPanel: React.FC = () => {
     starredChannelIds,
   } = useUiStore();
 
-  const { channels } = useWorkspace();
+  const { channels, users } = useWorkspace();
 
   const [isChannelsOpen, setIsChannelsOpen] = useState(true);
   const [isStarredOpen, setIsStarredOpen] = useState(true);
   const [isDmsOpen, setIsDmsOpen] = useState(true);
+  const [isAiAppsOpen, setIsAiAppsOpen] = useState(true);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +74,7 @@ export const SidebarPanel: React.FC = () => {
     (c) => !starredChannelIds.includes(c.id) && !customSectionChannelIds.includes(c.id),
   );
   const starredChannels = channels.filter((c) => starredChannelIds.includes(c.id));
+  const aiApps = users.filter((u) => isAgentUserId(u.id));
 
   if (activeRailTab === 'dms') {
     return (
@@ -379,6 +384,45 @@ export const SidebarPanel: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* 5. AI APPS section */}
+        {aiApps.length > 0 && (
+          <div className="px-2 pt-3">
+            <div className="mb-0.5 flex items-center justify-between px-2 py-1 rounded-md hover-surface group">
+              <button
+                type="button"
+                onClick={() => setIsAiAppsOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 text-[13px] font-semibold transition-colors flex-1 text-left"
+                style={{ color: 'var(--color-text-secondary)' }}
+                title={isAiAppsOpen ? 'Collapse AI Apps' : 'Expand AI Apps'}
+              >
+                {isAiAppsOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-stone-400 group-hover:text-stone-200 transition-transform" />
+                ) : (
+                  <ChevronUp className="h-3.5 w-3.5 shrink-0 text-stone-400 group-hover:text-stone-200 transition-transform" />
+                )}
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span>AI Apps</span>
+                <span
+                  className="text-[10px] px-1.5 py-0.2 rounded-full font-normal"
+                  style={{
+                    background: 'var(--color-elevated)',
+                    color: 'var(--color-text-tertiary)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  {aiApps.length}
+                </span>
+              </button>
+            </div>
+
+            {isAiAppsOpen && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-150">
+                <AiAppsList />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <ResizeHandle

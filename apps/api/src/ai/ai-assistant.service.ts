@@ -8,7 +8,7 @@ import { MessagesService } from '../chat/messages/messages.service';
 import { SearchService } from '../search/search.service';
 import { UPLOAD_DIR } from '../attachments/attachments.service';
 import { AiContextService } from './ai-context.service';
-import { NvidiaLlmService } from './nvidia-llm.service';
+import { LlmService } from './llm/llm.service';
 import type { SummarizeWindow } from './ai.constants';
 import { AGENT_PERSONAS } from './ai.constants';
 
@@ -28,7 +28,7 @@ export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
 
   constructor(
-    private readonly llm: NvidiaLlmService,
+    private readonly llm: LlmService,
     private readonly context: AiContextService,
     private readonly search: SearchService,
     private readonly prisma: PrismaService,
