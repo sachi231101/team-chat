@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
 import { attachMockIdentity } from '../mock-identity';
+import type { RequestUser } from '../request-user';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -25,7 +26,14 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest();
-    const user = attachMockIdentity(req);
+    let user: RequestUser;
+
+    if (req.user?.userId || req.user?.id) {
+      user = req.user as RequestUser;
+    } else {
+      user = attachMockIdentity(req);
+    }
+
     const permissions = user.permissions || [];
     const missing = required.filter((perm) => !permissions.includes(perm));
     if (missing.length) {

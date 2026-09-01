@@ -83,7 +83,7 @@ export class UsersController {
   async create(@CurrentUser() user: RequestUser, @Body() body: CreateUserDto): Promise<User> {
     try {
       const prismaStatus = (body.status?.toUpperCase() || 'ONLINE') as PrismaUserStatus;
-      const workplaceId = user.workplaceId || body.workplaceId || 'wp-teamchat-main';
+      const workplaceId = user.workplaceId || body.workplaceId || 'ws-acme-hq-dev';
 
       const u = await this.prisma.user.create({
         data: {

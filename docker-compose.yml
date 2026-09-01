@@ -43,16 +43,18 @@ services:
         required: false
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: 3001
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/teamchat?schema=public
       REDIS_URL: redis://redis:6379
       REDIS_REQUIRED: 'true'
       REDIS_CONNECT_TIMEOUT_MS: 8000
       SESSION_ENABLED: 'true'
       SESSION_SECRET: ${SESSION_SECRET:-team-chat-dev-session}
+      SHARED_JWT_SECRET: ${SHARED_JWT_SECRET:-workplace_platform_shared_product_launch_jwt_secret_2026}
+      WORKPLACE_PLATFORM_URL: ${WORKPLACE_PLATFORM_URL:-http://workplace-api:3000}
       TRUST_PROXY: 'true'
-      ALLOW_MOCK_IDENTITY: 'true'
-      ALLOWED_ORIGINS: http://localhost,http://127.0.0.1
+      ALLOW_MOCK_IDENTITY: 'false'
+      ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://localhost:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +66,7 @@ services:
           'CMD',
           'node',
           '-e',
-          'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+          'fetch("http://127.0.0.1:3001/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
         ]
       interval: 10s
       timeout: 5s

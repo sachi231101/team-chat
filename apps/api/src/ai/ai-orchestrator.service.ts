@@ -164,7 +164,7 @@ export class AiOrchestratorService implements OnModuleInit {
     if (agentId === 'usr-agent-research') {
       const workplaceId =
         (await this.prisma.user.findUnique({ where: { id: message.senderId }, select: { workplaceId: true } }))
-          ?.workplaceId || 'wp-teamchat-main';
+          ?.workplaceId || 'ws-acme-hq-dev';
       const { answer } = await this.assistant.researchReply(
         message.senderId,
         workplaceId,
@@ -200,7 +200,7 @@ export class AiOrchestratorService implements OnModuleInit {
   private async runWorkspaceAgent(message: Message, transcript: string): Promise<string> {
     const workplaceId =
       (await this.prisma.user.findUnique({ where: { id: message.senderId }, select: { workplaceId: true } }))
-        ?.workplaceId || 'wp-teamchat-main';
+        ?.workplaceId || 'ws-acme-hq-dev';
 
     const first = await this.llm.complete([
       { role: 'system', content: WORKSPACE_TOOL_PROMPT },

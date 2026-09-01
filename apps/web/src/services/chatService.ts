@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient';
 import { getApiBaseUrl } from '../lib/env';
+import { getStoredToken, getStoredUserId, getStoredWorkplaceId, shouldSendMockIdentityHeaders } from '../lib/currentUser';
 import {
   Channel,
   Conversation,
@@ -506,12 +507,17 @@ export const chatService = {
     const API_BASE_URL = getApiBaseUrl();
     const form = new FormData();
     form.append('file', file);
+    const uploadHeaders: Record<string, string> = {};
+    const token = getStoredToken();
+    if (token) {
+      uploadHeaders['Authorization'] = `Bearer ${token}`;
+    } else if (shouldSendMockIdentityHeaders()) {
+      uploadHeaders['x-user-id'] = getStoredUserId();
+      uploadHeaders['x-workplace-id'] = getStoredWorkplaceId();
+    }
     const response = await fetch(`${API_BASE_URL}/attachments/upload`, {
       method: 'POST',
-      headers: {
-        'x-user-id': localStorage.getItem('team_chat_user_id') || 'usr-rahul',
-        'x-workplace-id': 'wp-teamchat-main',
-      },
+      headers: uploadHeaders,
       body: form,
     });
     if (!response.ok) {

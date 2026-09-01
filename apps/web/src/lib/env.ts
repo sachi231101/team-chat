@@ -1,7 +1,7 @@
 export function getApiBaseUrl(): string {
   const value = import.meta.env.VITE_API_URL;
   if (value === '') return '';
-  return value || 'http://localhost:3000';
+  return value || 'http://localhost:3001';
 }
 
 export function getWsUrl(): string {
@@ -14,5 +14,9 @@ export function getWsUrl(): string {
   if (api && api.startsWith('/')) {
     return typeof window !== 'undefined' ? window.location.origin : '';
   }
-  return 'http://localhost:3000';
+  return 'http://localhost:3001';
+}
+
+export function getWorkplacePlatformUrl(): string {
+  return import.meta.env.VITE_WORKPLACE_PLATFORM_URL || 'http://localhost:3000';
 }

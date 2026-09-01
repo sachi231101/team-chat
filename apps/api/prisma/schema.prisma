@@ -59,7 +59,7 @@ model User {
   title         String?
   status        UserStatus  @default(ONLINE)
   statusMessage String?
-  workplaceId   String      @default("wp-teamchat-main")
+  workplaceId   String      @default("ws-acme-hq-dev")
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -90,7 +90,7 @@ model Channel {
   description String?
   topic       String?
   type        ChannelType @default(PUBLIC)
-  workplaceId String      @default("wp-teamchat-main")
+  workplaceId String      @default("ws-acme-hq-dev")
   createdById String
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -122,7 +122,7 @@ model ChannelMember {
 
 model Conversation {
   id          String   @id @default(uuid())
-  workplaceId String   @default("wp-teamchat-main")
+  workplaceId String   @default("ws-acme-hq-dev")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -268,7 +268,7 @@ model ActionItem {
   messageId      String?
   channelId      String?
   conversationId String?
-  workplaceId    String           @default("wp-teamchat-main")
+  workplaceId    String           @default("ws-acme-hq-dev")
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -308,7 +308,7 @@ model DecisionRecord {
   channelId     String?
   messageId     String?
   impactedAreas String[]       @default([])
-  workplaceId   String         @default("wp-teamchat-main")
+  workplaceId   String         @default("ws-acme-hq-dev")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -324,7 +324,7 @@ model DecisionRecord {
 
 model AiCorrection {
   id            String   @id @default(uuid())
-  workplaceId   String   @default("wp-teamchat-main")
+  workplaceId   String   @default("ws-acme-hq-dev")
   userId        String
   agentId       String?
   category      String   @default("general")
@@ -341,7 +341,7 @@ model AiCorrection {
 
 model AiLearningRule {
   id                 String   @id @default(uuid())
-  workplaceId        String   @default("wp-teamchat-main")
+  workplaceId        String   @default("ws-acme-hq-dev")
   rule               String   @db.Text
   category           String   @default("general")
   sourceCorrectionId String?
@@ -356,7 +356,7 @@ model AiLearningRule {
 
 model MultiAgentTrace {
   id                  String   @id @default(uuid())
-  workplaceId         String   @default("wp-teamchat-main")
+  workplaceId         String   @default("ws-acme-hq-dev")
   objective           String   @db.Text
   participatingAgents String[] @default([])
   steps               Json     @default("[]")
@@ -382,7 +382,7 @@ model Poll {
   messageId      String?      @unique
   channelId      String?
   conversationId String?
-  workplaceId    String       @default("wp-teamchat-main")
+  workplaceId    String       @default("ws-acme-hq-dev")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -401,7 +401,7 @@ model PollVote {
   pollId      String
   optionIndex Int
   userId      String
-  workplaceId String   @default("wp-teamchat-main")
+  workplaceId String   @default("ws-acme-hq-dev")
   createdAt   DateTime @default(now())
 
   poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)

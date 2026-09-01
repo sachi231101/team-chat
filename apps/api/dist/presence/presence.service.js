@@ -19,7 +19,7 @@ let PresenceService = class PresenceService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getAllPresence(workplaceId = 'wp-teamchat-main') {
+    async getAllPresence(workplaceId = 'ws-acme-hq-dev') {
         try {
             const users = await this.prisma.user.findMany({
                 where: { workplaceId },

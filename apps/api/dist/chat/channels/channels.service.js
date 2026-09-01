@@ -22,7 +22,7 @@ let ChannelsService = class ChannelsService {
         this.prisma = prisma;
         this.chatAccess = chatAccess;
     }
-    async findAll(workplaceId = 'wp-teamchat-main', userId) {
+    async findAll(workplaceId = 'ws-acme-hq-dev', userId) {
         try {
             const channels = await this.prisma.channel.findMany({
                 where: {
@@ -52,7 +52,7 @@ let ChannelsService = class ChannelsService {
             (0, safe_internal_error_1.throwInternal)('Failed to fetch channels', error);
         }
     }
-    async findOne(id, workplaceId = 'wp-teamchat-main') {
+    async findOne(id, workplaceId = 'ws-acme-hq-dev') {
         try {
             const c = await this.prisma.channel.findFirst({
                 where: { id, workplaceId },
@@ -86,7 +86,7 @@ let ChannelsService = class ChannelsService {
         if (!creatorId) {
             (0, safe_internal_error_1.throwInternal)('createdById is required');
         }
-        const wpId = data.workplaceId || 'wp-teamchat-main';
+        const wpId = data.workplaceId || 'ws-acme-hq-dev';
         const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
         try {
             const result = await this.prisma.$transaction(async (tx) => {

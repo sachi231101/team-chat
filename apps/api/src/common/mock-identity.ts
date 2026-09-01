@@ -6,26 +6,28 @@ import {
   DEFAULT_WORKPLACE_ID,
   type RequestUser,
 } from './request-user';
+import {
+  profileFromPlatformJwt,
+  requestUserFromPlatformJwt,
+  verifyPlatformLaunchToken,
+} from './platform-jwt';
+import { isMockIdentityAllowed } from './jwt-config';
 
 /**
  * TEMPORARY mock identity provider for Team Chat development.
- *
- * Identity is derived from trusted Workplace auth in production later.
- * Until then, development uses `x-user-id` / `x-workplace-id` headers
- * (and Socket.IO handshake auth) as a stand-in only.
- *
- * Replace this module with Workplace JWT / session verification —
- * do not spread header trust into new call sites.
+ * Disabled in production unless ALLOW_MOCK_IDENTITY=true.
  */
 const logger = new Logger('MockIdentity');
 let warnedOnce = false;
 
+export { isMockIdentityAllowed };
+
 function warnIfProductionMock(): void {
   if (warnedOnce) return;
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_IDENTITY !== 'true') {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_IDENTITY === 'true') {
     warnedOnce = true;
     logger.warn(
-      'Using temporary mock identity (header-based). Set ALLOW_MOCK_IDENTITY=true only for controlled staging; replace with Workplace auth before public launch.',
+      'ALLOW_MOCK_IDENTITY=true in production — header-based identity is enabled for controlled staging only.',
     );
   }
 }
@@ -33,6 +35,10 @@ function warnIfProductionMock(): void {
 export function resolveMockIdentityFromHeaders(
   headers: Record<string, unknown> | undefined,
 ): RequestUser {
+  if (!isMockIdentityAllowed()) {
+    throw new Error('Mock identity headers are disabled');
+  }
+
   warnIfProductionMock();
 
   const rawUser = headers?.['x-user-id'];
@@ -77,11 +83,53 @@ export function resolveMockIdentityFromHeaders(
   };
 }
 
+function resolveIdentityFromToken(token: string): RequestUser | null {
+  try {
+    const decoded = verifyPlatformLaunchToken(token);
+    return requestUserFromPlatformJwt(decoded);
+  } catch {
+    return null;
+  }
+}
+
+export function resolveIdentityFromHandshake(input: {
+  authToken?: unknown;
+  authUserId?: unknown;
+  authWorkplaceId?: unknown;
+  headers?: Record<string, unknown>;
+}): RequestUser {
+  const token =
+    (typeof input.authToken === 'string' && input.authToken.trim()) ||
+    (typeof input.headers?.authorization === 'string' && input.headers.authorization.startsWith('Bearer ')
+      ? input.headers.authorization.slice(7).trim()
+      : undefined);
+
+  if (token) {
+    const fromJwt = resolveIdentityFromToken(token);
+    if (fromJwt) {
+      return fromJwt;
+    }
+    if (!isMockIdentityAllowed()) {
+      throw new Error('Invalid launch token');
+    }
+  }
+
+  if (!isMockIdentityAllowed()) {
+    throw new Error('Authentication token required');
+  }
+
+  return resolveMockIdentityFromHandshake(input);
+}
+
 export function resolveMockIdentityFromHandshake(input: {
   authUserId?: unknown;
   authWorkplaceId?: unknown;
   headers?: Record<string, unknown>;
 }): RequestUser {
+  if (!isMockIdentityAllowed()) {
+    throw new Error('Mock identity is disabled');
+  }
+
   warnIfProductionMock();
 
   const fromAuthUser =
@@ -111,6 +159,10 @@ function mergeQueryIdentityHeaders(req: {
   headers?: Record<string, unknown>;
   query?: Record<string, unknown>;
 }): Record<string, unknown> | undefined {
+  if (!isMockIdentityAllowed()) {
+    return req.headers;
+  }
+
   const headers: Record<string, unknown> = { ...(req.headers || {}) };
   const query = req.query || {};
   if (!headers['x-user-id'] && query['x-user-id']) {
@@ -128,22 +180,24 @@ export function attachMockIdentity(req: {
   headers?: Record<string, unknown>;
   query?: Record<string, unknown>;
 }): RequestUser {
-  req.headers = mergeQueryIdentityHeaders(req);
-
   if (req.user?.userId || req.user?.id) {
     const uid = (req.user.userId || req.user.id) as string;
-    const headerFallback = resolveMockIdentityFromHeaders(req.headers);
     const user: RequestUser = {
       userId: uid,
       id: uid,
-      workplaceId: req.user.workplaceId || headerFallback.workplaceId,
-      role: req.user.role || headerFallback.role,
-      permissions: req.user.permissions || headerFallback.permissions,
+      workplaceId: req.user.workplaceId as string,
+      role: req.user.role || DEFAULT_ROLE,
+      permissions: req.user.permissions || DEFAULT_PERMISSIONS,
     };
     req.user = user;
     return user;
   }
 
+  if (!isMockIdentityAllowed()) {
+    throw new Error('Authentication required');
+  }
+
+  req.headers = mergeQueryIdentityHeaders(req);
   const user = resolveMockIdentityFromHeaders(req.headers);
   req.user = user;
   return user;

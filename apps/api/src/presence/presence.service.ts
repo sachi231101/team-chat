@@ -9,7 +9,7 @@ import { isPrismaNotFound } from '../common/prisma-errors';
 export class PresenceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAllPresence(workplaceId: string = 'wp-teamchat-main'): Promise<{ userId: string; status: string; statusMessage?: string }[]> {
+  async getAllPresence(workplaceId: string = 'ws-acme-hq-dev'): Promise<{ userId: string; status: string; statusMessage?: string }[]> {
     try {
       const users = await this.prisma.user.findMany({
         where: { workplaceId },

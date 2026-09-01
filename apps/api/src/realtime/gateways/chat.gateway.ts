@@ -14,13 +14,13 @@ import { PresenceService } from '../../presence/presence.service';
 import { RealtimeService } from '../realtime.service';
 import { ChatAccessService } from '../../common/chat-access.service';
 import { UserStatus } from '@team-chat/shared';
-import { resolveMockIdentityFromHandshake } from '../../common/mock-identity';
+import { resolveIdentityFromHandshake } from '../../common/mock-identity';
 
 function allowedOrigins(): string[] {
   const raw = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || '';
   const fromEnv = raw.split(',').map((s) => s.trim()).filter(Boolean);
   if (fromEnv.length) return fromEnv;
-  return ['http://localhost:5173', 'http://localhost:3001'];
+  return ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3000'];
 }
 
 @WebSocketGateway({
@@ -48,21 +48,26 @@ export class ChatGateway
   }
 
   handleConnection(client: Socket) {
-    const identity = resolveMockIdentityFromHandshake({
-      authUserId: client.handshake.auth?.userId,
-      authWorkplaceId: client.handshake.auth?.workplaceId,
-      headers: client.handshake.headers as Record<string, unknown>,
-    });
-    const userId = identity.userId;
-    const workplaceId = identity.workplaceId;
-    client.data.userId = userId;
-    client.data.workplaceId = workplaceId;
+    try {
+      const identity = resolveIdentityFromHandshake({
+        authToken: client.handshake.auth?.token,
+        authUserId: client.handshake.auth?.userId,
+        authWorkplaceId: client.handshake.auth?.workplaceId,
+        headers: client.handshake.headers as Record<string, unknown>,
+      });
+      const userId = identity.userId;
+      const workplaceId = identity.workplaceId;
+      client.data.userId = userId;
+      client.data.workplaceId = workplaceId;
 
-    // Join user's individual and workplace room
-    client.join(`user:${userId}`);
-    client.join(`workplace:${workplaceId}`);
+      client.join(`user:${userId}`);
+      client.join(`workplace:${workplaceId}`);
 
-    this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
+      this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
+    } catch (err) {
+      this.logger.warn(`WebSocket auth rejected: ${(err as Error).message}`);
+      client.disconnect(true);
+    }
   }
 
   handleDisconnect(client: Socket) {

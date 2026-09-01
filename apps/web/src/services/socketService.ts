@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { Message, User } from '@team-chat/shared';
-import { getStoredUserId } from '../lib/currentUser';
+import { getStoredToken, getStoredUserId, getStoredWorkplaceId, shouldSendMockIdentityHeaders } from '../lib/currentUser';
 import { getWsUrl } from '../lib/env';
 
 const SOCKET_URL = getWsUrl();
@@ -10,13 +10,16 @@ class SocketService {
 
   connect(): Socket {
     if (!this.socket) {
+      const token = getStoredToken();
+      const auth: Record<string, string | null> = { token };
+      if (!token && shouldSendMockIdentityHeaders()) {
+        auth.userId = getStoredUserId();
+        auth.workplaceId = getStoredWorkplaceId();
+      }
       this.socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'],
         autoConnect: true,
-        auth: {
-          userId: getStoredUserId(),
-          workplaceId: 'wp-teamchat-main',
-        },
+        auth,
       });
     }
     return this.socket;

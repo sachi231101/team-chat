@@ -3,16 +3,33 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { attachMockIdentity } from '../mock-identity';
+import { PrismaService } from '../prisma.service';
+import { attachMockIdentity, isMockIdentityAllowed } from '../mock-identity';
+import { RequestUser } from '../request-user';
+import { provisionUserPublicChannels } from '../default-channels';
+import {
+  profileFromPlatformJwt,
+  requestUserFromPlatformJwt,
+  verifyPlatformLaunchToken,
+} from '../platform-jwt';
+import { PlatformVerifyService } from '../platform-verify.service';
 
 @Injectable()
 export class IdentityGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  private readonly logger = new Logger(IdentityGuard.name);
 
-  canActivate(context: ExecutionContext): boolean {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
+    private readonly platformVerify: PlatformVerifyService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') {
       return true;
     }
@@ -25,20 +42,72 @@ export class IdentityGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest();
-    attachMockIdentity(req);
+    const authHeader = req.headers?.['authorization'] || req.headers?.['Authorization'];
+    const tokenQuery = req.query?.['token'];
+    const rawToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : typeof tokenQuery === 'string'
+        ? tokenQuery.trim()
+        : null;
 
-    const requireHeader =
-      process.env.NODE_ENV === 'production' &&
-      process.env.ALLOW_MOCK_IDENTITY !== 'true';
+    if (rawToken) {
+      try {
+        const decoded = verifyPlatformLaunchToken(rawToken);
+        const requestUser: RequestUser = requestUserFromPlatformJwt(decoded);
+        req.user = requestUser;
 
-    if (requireHeader) {
-      const raw = req.headers?.['x-user-id'] ?? req.query?.['x-user-id'];
-      const userId = Array.isArray(raw) ? raw[0] : raw;
-      if (!userId || typeof userId !== 'string' || !userId.trim()) {
-        throw new UnauthorizedException('Authentication required');
+        const verifyResult = await this.platformVerify.verifyLaunchToken(rawToken);
+        if (!verifyResult.valid) {
+          if (verifyResult.suspended) {
+            throw new ForbiddenException(verifyResult.error || 'User account is suspended.');
+          }
+          throw new UnauthorizedException(verifyResult.error || 'Launch token verification failed.');
+        }
+
+        const profile = profileFromPlatformJwt(decoded, requestUser.userId);
+
+        try {
+          const user = await this.prisma.user.upsert({
+            where: { id: requestUser.userId },
+            create: {
+              id: requestUser.userId,
+              email: profile.email,
+              name: profile.name,
+              avatarUrl: profile.avatarUrl,
+              workplaceId: requestUser.workplaceId,
+              status: 'ONLINE',
+            },
+            update: {
+              name: profile.name,
+              avatarUrl: profile.avatarUrl,
+              email: profile.email,
+              workplaceId: requestUser.workplaceId,
+            },
+          });
+
+          await provisionUserPublicChannels(this.prisma, user.id, requestUser.workplaceId);
+        } catch (dbErr) {
+          this.logger.warn(`Failed to auto-upsert shadow user: ${(dbErr as Error).message}`);
+        }
+
+        return true;
+      } catch (err: unknown) {
+        if (err instanceof UnauthorizedException || err instanceof ForbiddenException) {
+          throw err;
+        }
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.warn(`JWT verification failed: ${message}`);
+        if (!isMockIdentityAllowed()) {
+          throw new UnauthorizedException(`Invalid or expired token: ${message}`);
+        }
       }
     }
 
-    return true;
+    if (isMockIdentityAllowed()) {
+      attachMockIdentity(req);
+      return true;
+    }
+
+    throw new UnauthorizedException('Authentication token required');
   }
 }

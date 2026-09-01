@@ -26,7 +26,7 @@ function allowedOrigins() {
     const fromEnv = raw.split(',').map((s) => s.trim()).filter(Boolean);
     if (fromEnv.length)
         return fromEnv;
-    return ['http://localhost:5173', 'http://localhost:3001'];
+    return ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3000'];
 }
 let ChatGateway = ChatGateway_1 = class ChatGateway {
     presenceService;
@@ -43,18 +43,25 @@ let ChatGateway = ChatGateway_1 = class ChatGateway {
         this.realtime.setServer(server);
     }
     handleConnection(client) {
-        const identity = (0, mock_identity_1.resolveMockIdentityFromHandshake)({
-            authUserId: client.handshake.auth?.userId,
-            authWorkplaceId: client.handshake.auth?.workplaceId,
-            headers: client.handshake.headers,
-        });
-        const userId = identity.userId;
-        const workplaceId = identity.workplaceId;
-        client.data.userId = userId;
-        client.data.workplaceId = workplaceId;
-        client.join(`user:${userId}`);
-        client.join(`workplace:${workplaceId}`);
-        this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
+        try {
+            const identity = (0, mock_identity_1.resolveIdentityFromHandshake)({
+                authToken: client.handshake.auth?.token,
+                authUserId: client.handshake.auth?.userId,
+                authWorkplaceId: client.handshake.auth?.workplaceId,
+                headers: client.handshake.headers,
+            });
+            const userId = identity.userId;
+            const workplaceId = identity.workplaceId;
+            client.data.userId = userId;
+            client.data.workplaceId = workplaceId;
+            client.join(`user:${userId}`);
+            client.join(`workplace:${workplaceId}`);
+            this.logger.log(`Client connected: ${client.id} as ${userId} in ${workplaceId}`);
+        }
+        catch (err) {
+            this.logger.warn(`WebSocket auth rejected: ${err.message}`);
+            client.disconnect(true);
+        }
     }
     handleDisconnect(client) {
         this.logger.log(`Client disconnected: ${client.id}`);

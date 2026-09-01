@@ -28,7 +28,7 @@ let MentionsService = class MentionsService {
         return names;
     }
     async notifyFromMessage(message) {
-        let workplaceId = 'wp-teamchat-main';
+        let workplaceId = 'ws-acme-hq-dev';
         let allowedUserIds = new Set();
         if (message.channelId) {
             const channel = await this.prisma.channel.findUnique({

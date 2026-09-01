@@ -11,7 +11,7 @@ export class SearchService {
   async search(
     query: string,
     userId: string,
-    workplaceId: string = 'wp-teamchat-main',
+    workplaceId: string = 'ws-acme-hq-dev',
     scope: SearchScope = 'all',
   ) {
     if (!query || !query.trim()) {

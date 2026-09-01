@@ -18,7 +18,7 @@ let SearchService = class SearchService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async search(query, userId, workplaceId = 'wp-teamchat-main', scope = 'all') {
+    async search(query, userId, workplaceId = 'ws-acme-hq-dev', scope = 'all') {
         if (!query || !query.trim()) {
             return { messages: [], channels: [], users: [], scope };
         }

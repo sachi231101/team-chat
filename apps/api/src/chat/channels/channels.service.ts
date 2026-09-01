@@ -19,7 +19,7 @@ export class ChannelsService {
     private readonly chatAccess: ChatAccessService,
   ) {}
 
-  async findAll(workplaceId: string = 'wp-teamchat-main', userId?: string): Promise<Channel[]> {
+  async findAll(workplaceId: string = 'ws-acme-hq-dev', userId?: string): Promise<Channel[]> {
     try {
       const channels = await this.prisma.channel.findMany({
         where: {
@@ -50,7 +50,7 @@ export class ChannelsService {
     }
   }
 
-  async findOne(id: string, workplaceId: string = 'wp-teamchat-main'): Promise<Channel> {
+  async findOne(id: string, workplaceId: string = 'ws-acme-hq-dev'): Promise<Channel> {
     try {
       const c = await this.prisma.channel.findFirst({
         where: { id, workplaceId },
@@ -92,7 +92,7 @@ export class ChannelsService {
     if (!creatorId) {
       throwInternal('createdById is required');
     }
-    const wpId = data.workplaceId || 'wp-teamchat-main';
+    const wpId = data.workplaceId || 'ws-acme-hq-dev';
     const normalizedName = data.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
 
     try {

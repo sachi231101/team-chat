@@ -1,19 +1,7 @@
 import { getApiBaseUrl } from '../lib/env';
+import { getStoredToken, getStoredUserId, getStoredWorkplaceId, shouldSendMockIdentityHeaders } from '../lib/currentUser';
 
 const API_BASE_URL = getApiBaseUrl();
-
-/**
- * Returns the current user ID and workplace ID from localStorage.
- * This avoids a circular dependency with the Zustand store while still
- * sending the correct identity headers on every request.
- */
-function getCurrentUserId(): string {
-  return localStorage.getItem('team_chat_user_id') || 'usr-rahul';
-}
-
-function getCurrentWorkplaceId(): string {
-  return 'wp-teamchat-main';
-}
 
 export class ApiError extends Error {
   constructor(
@@ -27,18 +15,26 @@ export class ApiError extends Error {
 }
 
 export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getStoredToken();
+  const authHeaders: Record<string, string> = {};
+
+  if (token) {
+    authHeaders['Authorization'] = `Bearer ${token}`;
+  } else if (shouldSendMockIdentityHeaders()) {
+    authHeaders['x-user-id'] = getStoredUserId();
+    authHeaders['x-workplace-id'] = getStoredWorkplaceId();
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'x-user-id': getCurrentUserId(),
-      'x-workplace-id': getCurrentWorkplaceId(),
+      ...authHeaders,
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    // Try to extract a descriptive message from the backend JSON error body
     let message: string;
     try {
       const body = await response.json();
@@ -48,12 +44,10 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
       message = response.statusText;
     }
 
-    // Map status codes to user-friendly messages
     const friendlyMessage = getFriendlyErrorMessage(response.status, message);
     throw new ApiError(response.status, response.statusText, friendlyMessage);
   }
 
-  // Handle 204 No Content
   const contentType = response.headers.get('content-type');
   if (!contentType?.includes('application/json')) {
     return undefined as T;
@@ -65,7 +59,7 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
 function getFriendlyErrorMessage(status: number, detail: string): string {
   switch (status) {
     case 400: return `Invalid request: ${detail}`;
-    case 401: return 'Authentication required. Please sign in.';
+    case 401: return 'Authentication required. Please sign in via Workplace Platform.';
     case 403: return "You don't have access to this resource.";
     case 404: return 'Resource not found.';
     case 409: return `Conflict: ${detail}`;
@@ -76,4 +70,3 @@ function getFriendlyErrorMessage(status: number, detail: string): string {
     default:  return detail || `Request failed (${status})`;
   }
 }
-

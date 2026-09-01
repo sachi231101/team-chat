@@ -22,7 +22,7 @@ let ConversationsService = class ConversationsService {
         this.prisma = prisma;
         this.chatAccess = chatAccess;
     }
-    async findAll(workplaceId = 'wp-teamchat-main', userId) {
+    async findAll(workplaceId = 'ws-acme-hq-dev', userId) {
         try {
             const where = { workplaceId };
             if (userId) {
@@ -48,7 +48,7 @@ let ConversationsService = class ConversationsService {
             (0, safe_internal_error_1.throwInternal)('Failed to fetch conversations', error);
         }
     }
-    async findOne(id, workplaceId = 'wp-teamchat-main') {
+    async findOne(id, workplaceId = 'ws-acme-hq-dev') {
         try {
             const c = await this.prisma.conversation.findFirst({
                 where: { id, workplaceId },
@@ -73,7 +73,7 @@ let ConversationsService = class ConversationsService {
         }
     }
     async create(data) {
-        const wpId = data.workplaceId || 'wp-teamchat-main';
+        const wpId = data.workplaceId || 'ws-acme-hq-dev';
         const uniqueParticipants = Array.from(new Set(data.participants));
         try {
             await this.chatAccess.assertUsersBelongToWorkplace(wpId, uniqueParticipants);

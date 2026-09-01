@@ -41,54 +41,54 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
             this.logger.log('🌱 Seeding initial workspace users, channels, and conversations in PostgreSQL...');
             const usersData = [
                 {
-                    id: 'usr-rahul',
+                    id: 'usr-dev-rahul',
                     name: 'Rahul Sharma',
                     email: 'rahul.sharma@teamchat.io',
                     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
                     title: 'Lead Staff Engineer',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Architecting Team Chat 🚀',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
-                    id: 'usr-priya',
+                    id: 'usr-dev-priya',
                     name: 'Priya Patel',
                     email: 'priya.patel@teamchat.io',
                     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
                     title: 'Product Design Lead',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Polishing dark mode design system 🎨',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
-                    id: 'usr-arjun',
+                    id: 'usr-dev-arjun',
                     name: 'Arjun Mehta',
                     email: 'arjun.mehta@teamchat.io',
                     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
                     title: 'Principal Backend Architect',
                     status: client_1.UserStatus.BUSY,
                     statusMessage: 'Optimizing Redis PubSub & Prisma queries ⚡',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
-                    id: 'usr-sachin',
+                    id: 'usr-dev-sachin',
                     name: 'Sachin Verma',
                     email: 'sachin.verma@teamchat.io',
                     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
                     title: 'DevOps & Reliability Lead',
                     status: client_1.UserStatus.AWAY,
                     statusMessage: 'Monitoring deployment pipelines 📊',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
-                    id: 'usr-ananya',
+                    id: 'usr-dev-ananya',
                     name: 'Ananya Iyer',
                     email: 'ananya.iyer@teamchat.io',
                     avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
                     title: 'VP of Product',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Q3 Product Roadmap Sync 🗺️',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
                     id: 'usr-agent-research',
@@ -98,7 +98,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     title: 'AI Research Assistant',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Ready for deep technical research 🤖',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
                     id: 'usr-agent-meeting',
@@ -108,7 +108,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     title: 'AI Meeting & Agenda Lead',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Synthesizing action items ⚡',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
                     id: 'usr-agent-support',
@@ -118,7 +118,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     title: 'AI Support & Incident Copilot',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Monitoring system health 🛡️',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
                     id: 'usr-agent-workspace',
@@ -128,7 +128,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     title: 'Personal workspace assistant',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Catch-up, search, and drafts — DM only',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
                 {
                     id: 'usr-agent-task',
@@ -138,7 +138,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     title: 'AI Task Coordinator',
                     status: client_1.UserStatus.ONLINE,
                     statusMessage: 'Turning discussions into actionable work 📋',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                 },
             ];
             for (const u of usersData) {
@@ -155,8 +155,8 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     description: 'Company-wide announcements and discussions.',
                     topic: 'Team Chat V1 release sprint in progress 🎯',
                     type: client_1.ChannelType.PUBLIC,
-                    workplaceId: 'wp-teamchat-main',
-                    createdById: 'usr-rahul',
+                    workplaceId: 'ws-acme-hq-dev',
+                    createdById: 'usr-dev-rahul',
                 },
                 {
                     id: 'chn-announcements',
@@ -164,8 +164,8 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     description: 'Important team announcements and company news',
                     topic: 'Official company updates',
                     type: client_1.ChannelType.PUBLIC,
-                    workplaceId: 'wp-teamchat-main',
-                    createdById: 'usr-rahul',
+                    workplaceId: 'ws-acme-hq-dev',
+                    createdById: 'usr-dev-rahul',
                 },
                 {
                     id: 'chn-random',
@@ -173,8 +173,8 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     description: 'Watercooler chat, intros, and off-topic conversation',
                     topic: 'Say hello',
                     type: client_1.ChannelType.PUBLIC,
-                    workplaceId: 'wp-teamchat-main',
-                    createdById: 'usr-rahul',
+                    workplaceId: 'ws-acme-hq-dev',
+                    createdById: 'usr-dev-rahul',
                 },
                 {
                     id: 'chn-engineering',
@@ -182,8 +182,8 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     description: 'Technical architecture, code reviews, PRs, and system design discussions',
                     topic: 'Vite 6 + React 19 + Tailwind CSS + NestJS stack alignment',
                     type: client_1.ChannelType.PUBLIC,
-                    workplaceId: 'wp-teamchat-main',
-                    createdById: 'usr-arjun',
+                    workplaceId: 'ws-acme-hq-dev',
+                    createdById: 'usr-dev-arjun',
                 },
                 {
                     id: 'chn-design-system',
@@ -191,8 +191,8 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     description: 'Figma components, color palettes, micro-interactions, and accessibility',
                     topic: 'Tailwind styling tokens & dark/light theme polish ✨',
                     type: client_1.ChannelType.PUBLIC,
-                    workplaceId: 'wp-teamchat-main',
-                    createdById: 'usr-priya',
+                    workplaceId: 'ws-acme-hq-dev',
+                    createdById: 'usr-dev-priya',
                 },
             ];
             for (const c of channelsData) {
@@ -222,9 +222,9 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 where: { id: 'dm-priya' },
                 create: {
                     id: 'dm-priya',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                     participants: {
-                        create: [{ userId: 'usr-rahul' }, { userId: 'usr-priya' }],
+                        create: [{ userId: 'usr-dev-rahul' }, { userId: 'usr-dev-priya' }],
                     },
                 },
                 update: {},
@@ -233,9 +233,9 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 where: { id: 'dm-arjun' },
                 create: {
                     id: 'dm-arjun',
-                    workplaceId: 'wp-teamchat-main',
+                    workplaceId: 'ws-acme-hq-dev',
                     participants: {
-                        create: [{ userId: 'usr-rahul' }, { userId: 'usr-arjun' }],
+                        create: [{ userId: 'usr-dev-rahul' }, { userId: 'usr-dev-arjun' }],
                     },
                 },
                 update: {},
@@ -245,14 +245,14 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     {
                         id: 'msg-gen-1',
                         content: 'Welcome everyone to the Team Chat application! 🚀 PostgreSQL persistence and Socket.IO real-time delivery are now active.',
-                        senderId: 'usr-rahul',
+                        senderId: 'usr-dev-rahul',
                         channelId: 'chn-general',
                         pinned: true,
                     },
                     {
                         id: 'msg-gen-2',
                         content: 'The dark mode palette and interface styling look stunning! Excited for the V1 release.',
-                        senderId: 'usr-priya',
+                        senderId: 'usr-dev-priya',
                         channelId: 'chn-general',
                         pinned: false,
                     },
@@ -262,7 +262,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 data: [
                     {
                         id: 'notif-1',
-                        userId: 'usr-rahul',
+                        userId: 'usr-dev-rahul',
                         title: 'Priya Patel mentioned you in #general',
                         body: 'Hey @Rahul, check out the new design system tokens!',
                         type: client_1.NotificationType.MENTION,
@@ -271,7 +271,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                     },
                     {
                         id: 'notif-2',
-                        userId: 'usr-rahul',
+                        userId: 'usr-dev-rahul',
                         title: 'Arjun Mehta replied to your thread in #engineering',
                         body: 'Prisma schema and PostgreSQL migrations look solid 👍',
                         type: client_1.NotificationType.REPLY,
@@ -296,7 +296,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 title: 'AI Research Assistant',
                 status: client_1.UserStatus.ONLINE,
                 statusMessage: 'Ready for deep technical research',
-                workplaceId: 'wp-teamchat-main',
+                workplaceId: 'ws-acme-hq-dev',
             },
             {
                 id: 'usr-agent-meeting',
@@ -306,7 +306,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 title: 'AI Meeting & Agenda Lead',
                 status: client_1.UserStatus.ONLINE,
                 statusMessage: 'Synthesizing action items',
-                workplaceId: 'wp-teamchat-main',
+                workplaceId: 'ws-acme-hq-dev',
             },
             {
                 id: 'usr-agent-support',
@@ -316,7 +316,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 title: 'AI Support & Incident Copilot',
                 status: client_1.UserStatus.ONLINE,
                 statusMessage: 'Monitoring system health',
-                workplaceId: 'wp-teamchat-main',
+                workplaceId: 'ws-acme-hq-dev',
             },
             {
                 id: 'usr-agent-workspace',
@@ -326,7 +326,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 title: 'Personal workspace assistant',
                 status: client_1.UserStatus.ONLINE,
                 statusMessage: 'Catch-up, search, and drafts — DM only',
-                workplaceId: 'wp-teamchat-main',
+                workplaceId: 'ws-acme-hq-dev',
             },
             {
                 id: 'usr-agent-task',
@@ -336,7 +336,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
                 title: 'AI Task Coordinator',
                 status: client_1.UserStatus.ONLINE,
                 statusMessage: 'Turning discussions into actionable work',
-                workplaceId: 'wp-teamchat-main',
+                workplaceId: 'ws-acme-hq-dev',
             },
         ];
         try {
@@ -359,7 +359,7 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
     }
     async provisionMissingDefaultChannels() {
         try {
-            const workplaceId = 'wp-teamchat-main';
+            const workplaceId = 'ws-acme-hq-dev';
             const users = await this.user.findMany({ where: { workplaceId }, orderBy: { createdAt: 'asc' } });
             if (users.length === 0)
                 return;

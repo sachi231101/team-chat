@@ -1,12 +1,18 @@
 import { getApiBaseUrl } from './env';
+import {
+  getStoredToken,
+  getStoredUserId,
+  getStoredWorkplaceId,
+  shouldSendMockIdentityHeaders,
+} from './currentUser';
 
 const API_BASE_URL = getApiBaseUrl();
 
 /** Append mock identity query so <img>/<a> can hit gated /uploads without custom headers. */
 function withMockIdentity(url: string): string {
-  if (typeof localStorage === 'undefined') return url;
-  const userId = localStorage.getItem('team_chat_user_id') || 'usr-rahul';
-  const workplaceId = 'wp-teamchat-main';
+  if (!shouldSendMockIdentityHeaders()) return url;
+  const userId = getStoredUserId();
+  const workplaceId = getStoredWorkplaceId();
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}x-user-id=${encodeURIComponent(userId)}&x-workplace-id=${encodeURIComponent(workplaceId)}`;
 }

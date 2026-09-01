@@ -17,7 +17,7 @@ export class ConversationsService {
     private readonly chatAccess: ChatAccessService,
   ) {}
 
-  async findAll(workplaceId: string = 'wp-teamchat-main', userId?: string): Promise<Conversation[]> {
+  async findAll(workplaceId: string = 'ws-acme-hq-dev', userId?: string): Promise<Conversation[]> {
     try {
       const where: Record<string, unknown> = { workplaceId };
       if (userId) {
@@ -45,7 +45,7 @@ export class ConversationsService {
     }
   }
 
-  async findOne(id: string, workplaceId: string = 'wp-teamchat-main'): Promise<Conversation> {
+  async findOne(id: string, workplaceId: string = 'ws-acme-hq-dev'): Promise<Conversation> {
     try {
       const c = await this.prisma.conversation.findFirst({
         where: { id, workplaceId },
@@ -71,7 +71,7 @@ export class ConversationsService {
   }
 
   async create(data: { participants: string[]; workplaceId?: string }): Promise<Conversation> {
-    const wpId = data.workplaceId || 'wp-teamchat-main';
+    const wpId = data.workplaceId || 'ws-acme-hq-dev';
     const uniqueParticipants = Array.from(new Set(data.participants));
 
     try {

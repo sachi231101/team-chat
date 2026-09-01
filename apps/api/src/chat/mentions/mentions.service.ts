@@ -18,7 +18,7 @@ export class MentionsService {
   }
 
   async notifyFromMessage(message: Message): Promise<void> {
-    let workplaceId = 'wp-teamchat-main';
+    let workplaceId = 'ws-acme-hq-dev';
     let allowedUserIds = new Set<string>();
 
     if (message.channelId) {

@@ -1,5 +1,5 @@
-export const DEFAULT_MOCK_USER_ID = 'usr-rahul';
-export const DEFAULT_WORKPLACE_ID = 'wp-teamchat-main';
+export const DEFAULT_MOCK_USER_ID = 'usr-dev-rahul';
+export const DEFAULT_WORKPLACE_ID = 'ws-acme-hq-dev';
 export const DEFAULT_ROLE = 'member';
 export const DEFAULT_PERMISSIONS = [
   'chat:read',
